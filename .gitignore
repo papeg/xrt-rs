@@ -1,1 +1,6 @@
-/target
+target
+
+_x_add*
+*.xo*
+*.xclbin*
+*.log
