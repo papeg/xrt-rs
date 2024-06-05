@@ -6,4 +6,5 @@ _x_add*
 *.log
 .Xil
 .ipcache
+.run
 *.ltx
