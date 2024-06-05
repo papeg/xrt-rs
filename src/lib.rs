@@ -7,10 +7,17 @@ include!("bindings_c.rs");
 //include!("bindings_cpp.rs");
 pub mod wrapper;
 
+pub fn get_xclbin_path(name: &str) -> String {
+    let mode = match std::env::var("XCL_EMULATION_MODE") {
+        Ok(val) => val,
+        Err(_) => String::from("hw"),
+    };
+
+    format!("{}_{}.xclbin", name, mode)
+}
+
 #[test]
 fn run_kernel_raw() {
-    std::env::set_var("XCL_EMULATION_MODE", "sw_emu");
-
     let device_handle: xrtDeviceHandle = unsafe { xrtDeviceOpen(0) };
 
     assert_ne!(
@@ -19,7 +26,7 @@ fn run_kernel_raw() {
     );
 
     let xclbin_path =
-        std::ffi::CString::new("add_sw_emu.xclbin").expect("creating CString for xclbin_path");
+        std::ffi::CString::new(get_xclbin_path("add")).expect("creating CString for xclbin_path");
 
     let xclbin_handle = unsafe { xrtXclbinAllocFilename(xclbin_path.as_ptr() as *const i8) };
 

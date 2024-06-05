@@ -235,19 +235,24 @@ fn emu_open_device_test() {
 
 #[test]
 fn emu_open_device_load_xclbin_test() {
+    use crate::get_xclbin_path;
+
     let mut device = XRTDevice::from_index(0).unwrap();
     assert!(device.device_handle.is_some());
-    let xclbin = "./add_sw_emu.xclbin";
-    device.load_xclbin(xclbin).unwrap();
+    let xclbin_path = get_xclbin_path("add");
+    device.load_xclbin(&xclbin_path).unwrap();
     assert!(device.xclbin_handle.is_some());
     assert!(device.xclbin_uuid.is_some());
 }
 
 #[test]
 fn emu_open_device_load_xclbin_builder_test() {
+    use crate::get_xclbin_path;
+
+    let xclbin_path = get_xclbin_path("add");
     let device = XRTDevice::from_index(0)
         .unwrap()
-        .with_xclbin("./add_sw_emu.xclbin")
+        .with_xclbin(&xclbin_path)
         .unwrap()
         .with_kernel("add")
         .unwrap();
