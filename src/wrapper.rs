@@ -229,7 +229,7 @@ impl Drop for XRTDevice {
 // Tests
 #[test]
 fn emu_open_device_test() {
-    let mut device = XRTDevice::from_index(0).unwrap();
+    let device = XRTDevice::from_index(0).unwrap();
     assert!(device.device_handle.is_some());
 }
 
@@ -245,7 +245,7 @@ fn emu_open_device_load_xclbin_test() {
 
 #[test]
 fn emu_open_device_load_xclbin_builder_test() {
-    let mut device = XRTDevice::from_index(0)
+    let device = XRTDevice::from_index(0)
         .unwrap()
         .with_xclbin("./add_sw_emu.xclbin")
         .unwrap()
