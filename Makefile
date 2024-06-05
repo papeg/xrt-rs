@@ -1,6 +1,7 @@
 .PHONY: xclbin clean
 
 TARGET := hw
+PLATFORM := xilinx_u280_gen3x16_xdma_1_202211_1
 
 xclbin: add_$(TARGET).xclbin
 
@@ -13,6 +14,10 @@ add_$(TARGET).xo: ./add.cpp
 
 add_$(TARGET).xclbin: add_$(TARGET).xo
 	v++ $(LINK_FLAGS) --temp_dir _x_add_xclbin --output $@ add_$(TARGET).xo
+
+
+test: add_$(TARGET).xclbin
+	cargo test
 
 
 clean:

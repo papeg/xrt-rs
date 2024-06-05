@@ -5,6 +5,7 @@
 include!("bindings_c.rs");
 // tests for cpp bindings are failing
 //include!("bindings_cpp.rs");
+pub mod wrapper;
 
 #[test]
 fn run_kernel_raw() {

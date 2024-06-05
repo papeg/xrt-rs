@@ -4,3 +4,6 @@ _x_add*
 *.xo*
 *.xclbin*
 *.log
+.Xil
+.ipcache
+*.ltx
