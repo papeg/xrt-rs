@@ -1,5 +1,5 @@
 include!("bindings_c.rs");
-use std::{collections::HashMap, os::raw::c_void, rc::*};
+use std::{collections::HashMap, hash::Hash, os::raw::c_void, rc::*};
 
 /// Helper func to return if a given handle is null
 fn is_null(handle: *mut c_void) -> bool {
@@ -19,6 +19,9 @@ pub enum XRTError {
     MissingKernelError,
     RunCreationError,
     RunArgumentSetError(i32, i32), // Pass argument index and value. Required here, because one call might set different args, so we have to hold that information
+    UnrealizedBufferError, // Tried creating a kernel without constructing all required BOs first
+    InvalidGroupIDError,
+    FailedBOAllocError
 }
 
 /// Every state value that a run can have. These are ususally parsed from the u32 returned from the C-interface
@@ -59,6 +62,66 @@ impl From<u32> for ERTCommandState {
     }
 }
 
+pub struct XRTBO {
+    bo_handle: xrtBufferHandle,
+}
+
+/// Has no constructor, since it will be construced from a device
+impl XRTBO {
+    pub fn get_size(&self) -> usize {
+        unsafe {
+            xrtBOSize(self.bo_handle)
+        }
+    }
+
+    pub fn get_address(&self) -> u64 {
+        unsafe {
+            xrtBOAddress(self.bo_handle)
+        }
+    }
+}
+
+/// Represents an index of where to put arguments
+type ArgumentIndex = u32;
+
+/// Used to store the mapping of arguments per kernel. It defines an argument to either be taken as a buffer address/handle (returned from xrtKernelArgGroupId)
+/// or to be passed when constructing a run
+pub enum ArgumentType {
+    Buffer(xrtBufferHandle),
+    Passed,
+    NotRealizedBuffer(u32) // Represents a not yet initialized buffer of the given u32 size. A valid mapping of a kernel does not contain this variant
+}
+
+pub struct XRTKernel {
+    kernel_handle: xrtKernelHandle,
+    
+    /// A mapping to describe how a kernel has to be called. For every argument index specifies whether a buffer handle is used (which is prepared at
+    /// construction time of the XRTKernel) or whether it is left blank and requires input from XRT when calling the kernel. This is also
+    /// the reason why this struct doenst need to save the buffer handles explicitly
+    argument_mapping: HashMap<ArgumentIndex, ArgumentType>
+}
+
+impl XRTKernel {
+    /// Construct a new XRTKernel. This guards against acidentally not having initialized all required buffers
+    pub fn new(kernel_handle: xrtKernelHandle, argument_mapping: HashMap<ArgumentIndex, ArgumentType>) -> Result<Self, XRTError> {
+        if XRTKernel::is_ready(&argument_mapping) {
+            return Err(XRTError::UnrealizedBufferError);
+        }
+        Ok(
+            XRTKernel {
+                kernel_handle: kernel_handle,
+                argument_mapping: argument_mapping
+            }
+        )
+    }
+
+    /// Tells whether the XRTKernel is ready for execution. If not, its argument mapping has to be edited
+    pub fn is_ready(argument_mapping: &HashMap<ArgumentIndex, ArgumentType>) -> bool {
+        !argument_mapping.values().any(|x| matches!(x, ArgumentType::NotRealizedBuffer(_)))
+    }
+}
+
+
 /// Struct to manage runs. Creating a run does not start it. The current state of a given run can be checked on.
 pub struct XRTRun {
     run_handle: xrtRunHandle,
@@ -96,7 +159,7 @@ pub struct XRTDevice {
     device_handle: Option<xrtDeviceHandle>,
     xclbin_handle: Option<xrtXclbinHandle>,
     xclbin_uuid: Option<xuid_t>,
-    kernel_handles: HashMap<String, xrtKernelHandle>,
+    kernel_handles: HashMap<String, XRTKernel>,
     run_handles: HashMap<String, Vec<Rc<XRTRun>>>,
 }
 
@@ -207,7 +270,7 @@ impl XRTDevice {
     }
 
     /// Load a kernel by name. This name is then used to store it in a XRTRSDevice internal hashmap
-    fn load_kernel(self: &mut XRTDevice, name: &str) -> Result<(), XRTError> {
+    fn load_kernel(self: &mut XRTDevice, name: &str, initial_argument_mapping: HashMap<ArgumentIndex, ArgumentType>) -> Result<(), XRTError> {
         // If XCLBIN and UUID are set, load and store a handle to the specified kernel by it's name
         let raw_kernel_name =
             std::ffi::CString::new(name).expect("Error on creation of kernel name string!");
@@ -220,6 +283,7 @@ impl XRTDevice {
             "Cannot set kernel handler for a device without an XCLBIN handler".to_string(),
         ))?;
 
+        // Open kernel
         kernel_handle = unsafe {
             xrtPLKernelOpen(
                 self.device_handle.unwrap(),
@@ -231,43 +295,48 @@ impl XRTDevice {
             return Err(XRTError::KernelCreationError);
         }
 
-        self.kernel_handles.insert(name.to_string(), kernel_handle);
+
+        // Creating necessary buffer objects
+        let mut argument_mapping: HashMap<ArgumentIndex, ArgumentType> = HashMap::new();
+        for (k,v) in initial_argument_mapping {
+            if let ArgumentType::NotRealizedBuffer(required_size) = v {
+                let group_id_handle = unsafe { 
+                    xrtKernelArgGroupId(kernel_handle, k as i32) 
+                }; 
+                
+                if group_id_handle < 0 {
+                    return Err(XRTError::InvalidGroupIDError);
+                }
+
+                let bo_handle = unsafe { 
+                    xrtBOAlloc(
+                        self.device_handle.unwrap(), 
+                        required_size as usize, 
+                        XCL_BO_FLAGS_NONE as std::os::raw::c_ulong, 
+                        group_id_handle as std::os::raw::c_uint
+                    )
+                };
+
+                if is_null(bo_handle) {
+                    return Err(XRTError::FailedBOAllocError);
+                }
+
+                argument_mapping.insert(k, ArgumentType::Buffer(bo_handle));
+            } else {
+                argument_mapping.insert(k, v);
+            }
+        }
+
+
+        // Construct new kernel object
+        let xrtkernel = XRTKernel::new(kernel_handle, argument_mapping)?;
+        self.kernel_handles.insert(name.to_string(), xrtkernel);
         Ok(())
     }
 
-    fn get_kernel_handle(&self, name: &str) -> Option<&xrtKernelHandle> {
-        self.kernel_handles.get(name)
-    }
 
-    /// Open a new run handle. Errors if the kernel doesnt exist. Also takes a mapping of argument indices to argument values to set for the run
-    /// Returns an Rc to the run so the user can directly start the run without having to manage it through the device
-    pub fn open_run(
-        &mut self,
-        kernel_name: &str,
-        argument_map: &HashMap<i32, i32>,
-    ) -> Result<Rc<XRTRun>, XRTError> {
-        let kernel_handle = self
-            .get_kernel_handle(kernel_name)
-            .ok_or(XRTError::MissingKernelError)?;
-        let run_handle = unsafe { xrtRunOpen(*kernel_handle) };
-        if is_null(run_handle) {
-            return Err(XRTError::RunCreationError);
-        }
-
-        let xrtrun = Rc::new(XRTRun {
-            run_handle: run_handle,
-        });
-        xrtrun.set_args(argument_map)?;
-
-        let xref = Rc::clone(&xrtrun);
-
-        // Add the run handle to our map of handles
-        self.run_handles
-            .entry(kernel_name.to_string())
-            .or_insert(Vec::new())
-            .push(xrtrun);
-        Ok(xref)
-    }
+    /// Creates a run for a given kernel. Errors if no such kernel exists
+    pub fn run_kernel(start_directly: bool) {}
 }
 
 impl Drop for XRTDevice {
