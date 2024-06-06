@@ -1,7 +1,8 @@
 .PHONY: xclbin clean
 
-TARGET := hw
 PLATFORM := xilinx_u280_gen3x16_xdma_1_202211_1
+TARGET := sw_emu # hw
+
 
 xclbin: add_$(TARGET).xclbin
 

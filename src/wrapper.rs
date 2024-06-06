@@ -1,5 +1,5 @@
 include!("bindings_c.rs");
-use std::{collections::HashMap, os::raw::c_void};
+use std::{collections::HashMap, os::raw::c_void, rc::*};
 
 /// Helper func to return if a given handle is null
 fn is_null(handle: *mut c_void) -> bool {
@@ -21,13 +21,83 @@ pub enum XRTError {
     RunArgumentSetError(i32, i32), // Pass argument index and value. Required here, because one call might set different args, so we have to hold that information
 }
 
+/// Every state value that a run can have. These are ususally parsed from the u32 returned from the C-interface
+pub enum ERTCommandState {
+    Completed,
+    InvalidState(u32),
+    Abort,
+    Error,
+    Queued,
+    Running,
+    NoResponse,
+    Submitted,
+    New,
+    Max,
+    Timeout,
+    SKError,
+    SKCrashed,
+}
+
+impl From<u32> for ERTCommandState {
+    fn from(value: u32) -> Self {
+        //? Replace by macro?
+        match value {
+            ert_cmd_state_ERT_CMD_STATE_COMPLETED => ERTCommandState::Completed,
+            ert_cmd_state_ERT_CMD_STATE_ABORT => ERTCommandState::Abort,
+            ert_cmd_state_ERT_CMD_STATE_ERROR => ERTCommandState::Error,
+            ert_cmd_state_ERT_CMD_STATE_QUEUED => ERTCommandState::Queued,
+            ert_cmd_state_ERT_CMD_STATE_RUNNING => ERTCommandState::Running,
+            ert_cmd_state_ERT_CMD_STATE_NORESPONSE => ERTCommandState::NoResponse,
+            ert_cmd_state_ERT_CMD_STATE_SUBMITTED => ERTCommandState::Submitted,
+            ert_cmd_state_ERT_CMD_STATE_NEW => ERTCommandState::New,
+            ert_cmd_state_ERT_CMD_STATE_MAX => ERTCommandState::Max,
+            ert_cmd_state_ERT_CMD_STATE_TIMEOUT => ERTCommandState::Timeout,
+            ert_cmd_state_ERT_CMD_STATE_SKCRASHED => ERTCommandState::SKCrashed,
+            ert_cmd_state_ERT_CMD_STATE_SKERROR => ERTCommandState::SKError,
+            _ => ERTCommandState::InvalidState(value),
+        }
+    }
+}
+
+/// Struct to manage runs. Creating a run does not start it. The current state of a given run can be checked on.
+pub struct XRTRun {
+    run_handle: xrtRunHandle,
+}
+
+/// This impl does not contain a constructor because a valid run can and should only be constructed from a device!
+impl XRTRun {
+    /// Return the current state of the run
+    pub fn get_state(&self) -> ERTCommandState {
+        let state: u32 = unsafe { xrtRunState(self.run_handle) };
+        ERTCommandState::from(state)
+    }
+
+    /// Set a mapping of arguments from indices to values for this run
+    pub fn set_args(&self, argument_map: &HashMap<i32, i32>) -> Result<(), XRTError> {
+        for argument_index in argument_map.keys() {
+            self.set_arg(*argument_index, argument_map[argument_index])?;
+        }
+        Ok(())
+    }
+
+    /// Set a single argument for this run
+    pub fn set_arg(&self, arg_index: i32, arg_value: i32) -> Result<(), XRTError> {
+        if unsafe { xrtRunSetArg(self.run_handle, arg_index, arg_value) } != 0 {
+            return Err(XRTError::RunArgumentSetError(arg_index, arg_value));
+        }
+        Ok(())
+    }
+
+    pub fn start_run() {}
+}
+
 #[allow(dead_code)]
 pub struct XRTDevice {
     device_handle: Option<xrtDeviceHandle>,
     xclbin_handle: Option<xrtXclbinHandle>,
     xclbin_uuid: Option<xuid_t>,
     kernel_handles: HashMap<String, xrtKernelHandle>,
-    run_handles: HashMap<String, Vec<xrtRunHandle>>,
+    run_handles: HashMap<String, Vec<Rc<XRTRun>>>,
 }
 
 // TODO: Make generic for all types that implement Num Trait
@@ -170,11 +240,12 @@ impl XRTDevice {
     }
 
     /// Open a new run handle. Errors if the kernel doesnt exist. Also takes a mapping of argument indices to argument values to set for the run
-    fn open_run(
+    /// Returns an Rc to the run so the user can directly start the run without having to manage it through the device
+    pub fn open_run(
         &mut self,
         kernel_name: &str,
         argument_map: &HashMap<i32, i32>,
-    ) -> Result<(), XRTError> {
+    ) -> Result<Rc<XRTRun>, XRTError> {
         let kernel_handle = self
             .get_kernel_handle(kernel_name)
             .ok_or(XRTError::MissingKernelError)?;
@@ -183,24 +254,19 @@ impl XRTDevice {
             return Err(XRTError::RunCreationError);
         }
 
-        for argument_index in argument_map.keys() {
-            // TODO: Introduce method to do this manually afterwards as well
-            if unsafe { xrtRunSetArg(run_handle, *argument_index, argument_map[argument_index]) }
-                != 0
-            {
-                return Err(XRTError::RunArgumentSetError(
-                    *argument_index,
-                    argument_map[argument_index],
-                ));
-            }
-        }
+        let xrtrun = Rc::new(XRTRun {
+            run_handle: run_handle,
+        });
+        xrtrun.set_args(argument_map)?;
+
+        let xref = Rc::clone(&xrtrun);
 
         // Add the run handle to our map of handles
         self.run_handles
             .entry(kernel_name.to_string())
             .or_insert(Vec::new())
-            .push(run_handle);
-        Ok(())
+            .push(xrtrun);
+        Ok(xref)
     }
 }
 
@@ -210,7 +276,7 @@ impl Drop for XRTDevice {
         // Close runs
         for kernel_name in self.run_handles.keys() {
             for run_handle in &self.run_handles[kernel_name] {
-                unsafe { xrtRunClose(*run_handle) };
+                unsafe { xrtRunClose(run_handle.run_handle) };
             }
         }
 
