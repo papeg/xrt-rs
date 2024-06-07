@@ -1,3 +1,16 @@
+//! xrt-rs is a wrapper around AMDs XRT C-Bindings, aiming to provide higher level abstraction and error handling.
+//! 
+//! # Example
+//! This is roughly how one would use the wrapper to interact with a datacenter FPGA:
+//! ```
+//! let mut device = XRTDevice::from_index(0)?;
+//! device.load_xclbin("my_xclbin.xclbin")?;
+//! device.load_kernel("add_kernel")?;
+//! devce.run_kernel(...)?;
+//! ```
+//! 
+//! Alternatively, builder-style constructors are also available
+
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
@@ -5,7 +18,8 @@
 include!("bindings_c.rs");
 // tests for cpp bindings are failing
 //include!("bindings_cpp.rs");
-pub mod wrapper;
+pub mod wrapper_tests;
+pub mod components;
 
 pub fn get_xclbin_path(name: &str) -> String {
     let mode = match std::env::var("XCL_EMULATION_MODE") {
