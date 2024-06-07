@@ -28,7 +28,7 @@ impl XRTKernel {
 
     /// Tells whether the XRTKernel is ready for execution. If not, its argument mapping has to be edited
     pub fn is_ready(argument_mapping: &HashMap<ArgumentIndex, ArgumentType>) -> bool {
-        !argument_mapping.values().any(|x| matches!(x, ArgumentType::NotRealizedBuffer(_)))
+        !argument_mapping.values().any(|x| matches!(x, ArgumentType::NotRealizedBuffer(_,_)))
     }
 
     // Create a run. Doing this does not execute any action. It just prepares the arguments
@@ -41,7 +41,23 @@ impl XRTKernel {
             return Err(XRTError::RunCreationError);
         }
         Ok(
-            XRTRun { run_handle: run_handle, argument_mapping: &self.argument_mapping, argument_data: argument_data }
+            XRTRun::new(run_handle, &self.argument_mapping, argument_data)
         )
+    }
+}
+
+impl Drop for XRTKernel {
+    fn drop(&mut self) {
+        // Deallocate all buffers
+        for arg in self.argument_mapping.values() {
+            match arg {
+                ArgumentType::InputBuffer(bhdl) | ArgumentType::OutputBuffer(bhdl)=> unsafe { xrtBOFree(*bhdl); },
+                _ => ()
+            }
+        }
+
+        // Close kernel itself
+        unsafe { xrtKernelClose(self.kernel_handle); }
+        // TODO: What to do if this fails?
     }
 }

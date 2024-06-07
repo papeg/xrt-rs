@@ -38,13 +38,13 @@ impl<'a> XRTDevice<'a> {
         XRTDevice::try_from(index)
     }
 
-    pub fn with_xclbin(mut self, filepath: &str) -> Result<XRTDevice, XRTError> {
+    pub fn with_xclbin(mut self, filepath: String) -> Result<XRTDevice<'a>, XRTError> {
         self.load_xclbin(filepath)?;
         Ok(self)
     }
 
-    pub fn with_kernel(mut self, name: &str) -> Result<XRTDevice, XRTError> {
-        self.load_kernel(name)?;
+    pub fn with_kernel(mut self, name: String, argument_mapping: HashMap<ArgumentIndex, ArgumentType>) -> Result<XRTDevice<'a>, XRTError> {
+        self.load_kernel(name, argument_mapping)?;
         Ok(self)
     }
 
@@ -95,7 +95,7 @@ impl<'a> XRTDevice<'a> {
     }
 
     /// Load the xclbin by filename and additionally set the UUID member of the XRTRSDevice.
-    pub fn load_xclbin(&mut self, filepath: &str) -> Result<(), XRTError> {
+    pub fn load_xclbin(&mut self, filepath: String) -> Result<(), XRTError> {
         // 1. Alloc the xclbin filename
         // 2. Load the xclbin onto the device
         // 3. Set UUID for the loaded XCLBIN
@@ -119,11 +119,15 @@ impl<'a> XRTDevice<'a> {
         Ok(())
     }
 
+    pub fn get_kernel(&self, name: &str) -> Option<&XRTKernel> {
+        self.kernel_handles.get(name)
+    }
+
     /// Load a kernel by name. This name is then used to store it in a XRTRSDevice internal hashmap
-    fn load_kernel(&mut self, name: &str, initial_argument_mapping: HashMap<ArgumentIndex, ArgumentType>) -> Result<(), XRTError> {
+    pub fn load_kernel(&mut self, name: String, initial_argument_mapping: HashMap<ArgumentIndex, ArgumentType>) -> Result<(), XRTError> {
         // If XCLBIN and UUID are set, load and store a handle to the specified kernel by it's name
         let raw_kernel_name =
-            std::ffi::CString::new(name).expect("Error on creation of kernel name string!");
+            std::ffi::CString::new(name.clone()).expect("Error on creation of kernel name string!");
         if self.xclbin_handle == None {
             return Err(XRTError::XclbinNotLoadedError);
         }
@@ -149,7 +153,7 @@ impl<'a> XRTDevice<'a> {
         // Creating necessary buffer objects
         let mut argument_mapping: HashMap<ArgumentIndex, ArgumentType> = HashMap::new();
         for (k,v) in initial_argument_mapping {
-            if let ArgumentType::NotRealizedBuffer(required_size) = v {
+            if let ArgumentType::NotRealizedBuffer(required_size, iomode) = v {
                 let group_id_handle = unsafe { 
                     xrtKernelArgGroupId(kernel_handle, k as i32) 
                 }; 
@@ -170,13 +174,16 @@ impl<'a> XRTDevice<'a> {
                 if is_null(bo_handle) {
                     return Err(XRTError::FailedBOAllocError);
                 }
-
-                argument_mapping.insert(k, ArgumentType::Buffer(bo_handle));
+                
+                if let IOMode::Input = iomode {
+                    argument_mapping.insert(k, ArgumentType::InputBuffer(bo_handle));
+                } else if let IOMode::Output = iomode {
+                    argument_mapping.insert(k, ArgumentType::OutputBuffer(bo_handle));
+                }
             } else {
                 argument_mapping.insert(k, v);
             }
         }
-
 
         // Construct new kernel object
         let xrtkernel = XRTKernel::new(kernel_handle, argument_mapping)?;
@@ -190,17 +197,12 @@ impl<'a> XRTDevice<'a> {
 impl Drop for XRTDevice<'_> {
     fn drop(&mut self) {
         // TODO: Deallocate any buffers
-        // Close runs
-        for kernel_name in self.run_handles.keys() {
-            for run_handle in &self.run_handles[kernel_name] {
-                unsafe { xrtRunClose(run_handle.run_handle) };
-            }
-        }
 
         // Close kernels
-        for kernel in self.kernel_handles.values() {
-            unsafe { xrtKernelClose(*kernel) };
-        }
+        //? Necessary or automatic? Run <- Kernel <- Device
+        //for kernel in self.kernel_handles.into_values() {
+        //    std::mem::drop(kernel);
+       // }
 
         // Make sure to not try to close a non-open device
         if self.device_handle.is_some() {

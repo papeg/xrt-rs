@@ -1,36 +1,40 @@
-#[test]
-fn emu_open_device_test() -> Result<(), XRTError> {
-    let device = XRTDevice::from_index(0)?;
-    assert!(device.device_handle.is_some());
-    Ok(())
-}
+#[allow(unused_imports)]
+use std::collections::HashMap;
+#[allow(unused_imports)]
+use crate::components::common::*;
+#[allow(unused_imports)]
+use crate::components::device::*;
+#[allow(unused_imports)]
+use crate::components::kernel::*;
+#[allow(unused_imports)]
+use crate::components::run::*;
+use crate::get_xclbin_path;
 
 #[test]
-fn emu_open_device_load_xclbin_test() -> Result<(), XRTError> {
-    use crate::get_xclbin_path;
+fn test_addition() -> Result<(), XRTError> {
+    
+    let arglist = HashMap::from([
+        (0, ArgumentType::Passed),
+        (1, ArgumentType::Passed),
+        (2, ArgumentType::NotRealizedBuffer(4, IOMode::Output))
+    ]);
 
     let mut device = XRTDevice::from_index(0)?;
-    assert!(device.device_handle.is_some());
-    let xclbin_path = get_xclbin_path("add");
-    device.load_xclbin(&xclbin_path)?;
-    assert!(device.xclbin_handle.is_some());
-    assert!(device.xclbin_uuid.is_some());
+    device.load_xclbin(get_xclbin_path("add"))?;
+    device.load_kernel("add".to_owned(), arglist)?;
+    
+    let kernel = device.get_kernel("add").ok_or(XRTError::GeneralError(String::from("a")))?;
 
-    Ok(())
-}
+    let args = HashMap::from([
+        (0, Argument::Direct(2)),
+        (1, Argument::Direct(3)),
+        (2, Argument::BufferContent(vec![0, 0, 0, 0])) 
+    ]);
 
-#[test]
-fn emu_open_device_load_xclbin_builder_test() -> Result<(), XRTError> {
-    use crate::get_xclbin_path;
+    let run = kernel.create_run(args)?;
+    let finished_state = run.start_run(true, true)?;
 
-    let xclbin_path = get_xclbin_path("add");
-    let device = XRTDevice::from_index(0)?
-        .with_xclbin(&xclbin_path)?
-        .with_kernel("add")?;
+    assert_eq!(finished_state, ERTCommandState::Completed);
 
-    assert!(device.device_handle.is_some());
-    assert!(device.xclbin_handle.is_some());
-    assert!(device.xclbin_uuid.is_some());
-
-    Ok(())
+   Ok(()) 
 }

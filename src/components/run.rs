@@ -9,11 +9,18 @@ use crate::components::common::*;
 pub struct XRTRun<'a> {
     run_handle: xrtRunHandle,
     argument_mapping: &'a HashMap<ArgumentIndex, ArgumentType>,   // What kind of arguments and where to sync to
-    argument_data: HashMap<ArgumentIndex, Argument>               // The content of the arguments itself
+    argument_data: HashMap<ArgumentIndex, Argument>,               // The content of the arguments itself
+
 }
 
 /// This impl does not contain a constructor because a valid run can and should only be constructed from a device!
 impl<'a> XRTRun<'a> {
+    /// *Do not create manually, use `XRTKernel::create_run` instead*
+    pub fn new(rhdl: *mut c_void, argument_mapping: &'a HashMap<ArgumentIndex, ArgumentType>, argument_data: HashMap<ArgumentIndex, Argument>) -> Self {
+        XRTRun { run_handle: rhdl, argument_mapping: argument_mapping, argument_data: argument_data }
+    }
+
+
     /// Return the current state of the run
     pub fn get_state(&self) -> ERTCommandState {
         let state: u32 = unsafe { xrtRunState(self.run_handle) };
@@ -30,12 +37,12 @@ impl<'a> XRTRun<'a> {
             return Err(XRTError::NonMatchingArgumentLists);
         }
 
-        for (index, value) in self.argument_data {
+        for (index, value) in &self.argument_data {
             match value {
                 Argument::Direct(data) => { 
-                    let result = unsafe { xrtRunSetArg(self.run_handle, index as i32) };
+                    let result = unsafe { xrtRunSetArg(self.run_handle, *index as i32) };
                     if result != 0 {
-                        return Err(XRTError::RunArgumentSetError(index, data));
+                        return Err(XRTError::RunArgumentSetError(*index, *data));
                     }
                 },
 
@@ -43,11 +50,11 @@ impl<'a> XRTRun<'a> {
                     // Get the buffer handle
                     let buffer_handle_result = self.argument_mapping.get(&index).ok_or(XRTError::InvalidArgumentIndex)?;
                     let buffer_handle = match buffer_handle_result {
-                        ArgumentType::Buffer(bhdl) => *bhdl,
-                        _ => return Err(XRTError::ExpectedBufferArgumentType)
+                        ArgumentType::InputBuffer(bhdl) => *bhdl,
+                        _ => return Err(XRTError::ExpectedInputBufferArgumentType)
                     };
 
-                    // Write data to fpga
+                    // Write data to buffer
                     let write_result = unsafe { xrtBOWrite(buffer_handle, data.as_ptr() as *mut std::os::raw::c_void, data.len(), 0) };
                     if write_result != 0 {
                         return Err(XRTError::FailedBOWrite);
@@ -64,5 +71,29 @@ impl<'a> XRTRun<'a> {
         Ok(())
     }
 
-    pub fn start_run() {}
+    /// Start this run. If given wait until the result is returned. If `load_arguments` is true, the arguments are first loaded
+    /// and written to the buffer and synced. This can be set to false, if the user loaded the argument manually first 
+    pub fn start_run(&self, load_arguments: bool, wait: bool) -> Result<ERTCommandState, XRTError> {
+        if load_arguments {
+            self.load_arguments()?;
+        }
+
+        if unsafe { xrtRunStart(self.run_handle) } != 0 {
+            return Err(XRTError::FailedRunStart);
+        }
+
+        if wait {
+            let finished_state = unsafe { xrtRunWait(self.run_handle) };
+            Ok(ERTCommandState::from(finished_state))
+        } else {
+            Ok(self.get_state())
+        }
+    }
+}
+
+impl<'a> Drop for XRTRun<'a> {
+    fn drop(&mut self) {
+        unsafe { xrtRunClose(self.run_handle); }
+        // TODO: How to handle if this fails?
+    }
 }

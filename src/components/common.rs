@@ -1,5 +1,6 @@
 include!("../bindings_c.rs");
-use std::{collections::HashMap, hash::Hash, os::raw::c_void, rc::*};
+use std::{os::raw::c_void, rc::*};
+
 
 
 /// Helper func to return if a given handle is null
@@ -25,12 +26,15 @@ pub enum XRTError {
     FailedBOAllocError,
     NonMatchingArgumentLists, // For when the Argument mappings and contents of an XRTRun dont agree in length
     InvalidArgumentIndex,
-    ExpectedBufferArgumentType, // For when an argument is passed to fill a buffer, but the argument mapping requires a direct pass
+    ExpectedInputBufferArgumentType, // For when an argument is passed to fill a buffer, but the argument mapping requires a direct pass
     FailedBOWrite,
     FailedBOSyncToDevice,
+    FailedRunStart,
+    FailedBORead,
 }
 
 /// Every state value that a run can have. These are ususally parsed from the u32 returned from the C-interface
+#[derive(Debug, PartialEq)]
 pub enum ERTCommandState {
     Completed,
     InvalidState(u32),
@@ -71,12 +75,18 @@ impl From<u32> for ERTCommandState {
 /// Represents an index of where to put arguments
 pub type ArgumentIndex = u32;
 
+pub enum IOMode {
+    Input,
+    Output
+}
+
 /// Used to store the mapping of arguments per kernel. It defines an argument to either be taken as a buffer address/handle (returned from xrtKernelArgGroupId)
 /// or to be passed when constructing a run
 pub enum ArgumentType {
-    Buffer(xrtBufferHandle),
+    InputBuffer(xrtBufferHandle),
+    OutputBuffer(xrtBufferHandle),
     Passed,
-    NotRealizedBuffer(u32) // Represents a not yet initialized buffer of the given u32 size. A valid mapping of a kernel does not contain this variant
+    NotRealizedBuffer(u32, IOMode) // Represents a not yet initialized buffer of the given u32 size. A valid mapping of a kernel does not contain this variant
 }
 
 /// This enum is used to store how the argument is supposed to be used when creating a run. The difference to `ArgumentType` is, that
