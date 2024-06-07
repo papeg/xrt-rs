@@ -18,10 +18,15 @@ pub enum XRTError {
     KernelCreationError,
     MissingKernelError,
     RunCreationError,
-    RunArgumentSetError(i32, i32), // Pass argument index and value. Required here, because one call might set different args, so we have to hold that information
+    RunArgumentSetError(ArgumentIndex, i32), // Pass argument index and value. Required here, because one call might set different args, so we have to hold that information
     UnrealizedBufferError, // Tried creating a kernel without constructing all required BOs first
     InvalidGroupIDError,
-    FailedBOAllocError
+    FailedBOAllocError,
+    NonMatchingArgumentLists, // For when the Argument mappings and contents of an XRTRun dont agree in length
+    InvalidArgumentIndex,
+    ExpectedBufferArgumentType, // For when an argument is passed to fill a buffer, but the argument mapping requires a direct pass
+    FailedBOWrite,
+    FailedBOSyncToDevice,
 }
 
 /// Every state value that a run can have. These are ususally parsed from the u32 returned from the C-interface
@@ -62,25 +67,6 @@ impl From<u32> for ERTCommandState {
     }
 }
 
-pub struct XRTBO {
-    bo_handle: xrtBufferHandle,
-}
-
-/// Has no constructor, since it will be construced from a device
-impl XRTBO {
-    pub fn get_size(&self) -> usize {
-        unsafe {
-            xrtBOSize(self.bo_handle)
-        }
-    }
-
-    pub fn get_address(&self) -> u64 {
-        unsafe {
-            xrtBOAddress(self.bo_handle)
-        }
-    }
-}
-
 /// Represents an index of where to put arguments
 type ArgumentIndex = u32;
 
@@ -90,6 +76,13 @@ pub enum ArgumentType {
     Buffer(xrtBufferHandle),
     Passed,
     NotRealizedBuffer(u32) // Represents a not yet initialized buffer of the given u32 size. A valid mapping of a kernel does not contain this variant
+}
+
+/// This enum is used to store how the argument is supposed to be used when creating a run. The difference to `ArgumentType` is, that
+/// this one specifies the arguments for a run, but `ArgumentType` specifies for which arguments a buffer to create and what their handle is
+pub enum Argument {
+    Direct(i32),
+    BufferContent(Vec<i8>)
 }
 
 pub struct XRTKernel {
@@ -104,7 +97,7 @@ pub struct XRTKernel {
 impl XRTKernel {
     /// Construct a new XRTKernel. This guards against acidentally not having initialized all required buffers
     pub fn new(kernel_handle: xrtKernelHandle, argument_mapping: HashMap<ArgumentIndex, ArgumentType>) -> Result<Self, XRTError> {
-        if XRTKernel::is_ready(&argument_mapping) {
+        if !XRTKernel::is_ready(&argument_mapping) {
             return Err(XRTError::UnrealizedBufferError);
         }
         Ok(
@@ -119,34 +112,80 @@ impl XRTKernel {
     pub fn is_ready(argument_mapping: &HashMap<ArgumentIndex, ArgumentType>) -> bool {
         !argument_mapping.values().any(|x| matches!(x, ArgumentType::NotRealizedBuffer(_)))
     }
+
+    // Create a run. Doing this does not execute any action. It just prepares the arguments
+    pub fn create_run(&self, argument_data: HashMap<ArgumentIndex, Argument>) -> Result<XRTRun, XRTError> {
+        if argument_data.len() != self.argument_mapping.len() {
+            return Err(XRTError::NonMatchingArgumentLists);
+        }
+        let run_handle = unsafe { xrtRunOpen(self.kernel_handle) };
+        if is_null(run_handle) {
+            return Err(XRTError::RunCreationError);
+        }
+        Ok(
+            XRTRun { run_handle: run_handle, argument_mapping: &self.argument_mapping, argument_data: argument_data }
+        )
+    }
 }
 
 
 /// Struct to manage runs. Creating a run does not start it. The current state of a given run can be checked on.
-pub struct XRTRun {
+/// **Key idea** is to give the data to synchronize directly to a run instead of the buffers. When the run is started it can automatically
+/// transfer the data. The user can advise it to do so at any point as well
+pub struct XRTRun<'a> {
     run_handle: xrtRunHandle,
+    argument_mapping: &'a HashMap<ArgumentIndex, ArgumentType>,   // What kind of arguments and where to sync to
+    argument_data: HashMap<ArgumentIndex, Argument>               // The content of the arguments itself
 }
 
 /// This impl does not contain a constructor because a valid run can and should only be constructed from a device!
-impl XRTRun {
+impl<'a> XRTRun<'a> {
     /// Return the current state of the run
     pub fn get_state(&self) -> ERTCommandState {
         let state: u32 = unsafe { xrtRunState(self.run_handle) };
         ERTCommandState::from(state)
     }
 
-    /// Set a mapping of arguments from indices to values for this run
-    pub fn set_args(&self, argument_map: &HashMap<i32, i32>) -> Result<(), XRTError> {
-        for argument_index in argument_map.keys() {
-            self.set_arg(*argument_index, argument_map[argument_index])?;
+    /// This sets the direct arguments of the run and fills the buffers with the data and syncs them. If this is done without
+    /// executing the kernel, another XRTRun might do the same and overwrite the data. 
+    /// 
+    /// __This is manually called by `start_run()`. So in many cases you will want to use that convenience method and
+    /// only use this one in case you need to have more precise control.__
+    pub fn load_arguments(&self) -> Result<(), XRTError> {
+        if self.argument_data.len() != self.argument_mapping.len() {
+            return Err(XRTError::NonMatchingArgumentLists);
         }
-        Ok(())
-    }
 
-    /// Set a single argument for this run
-    pub fn set_arg(&self, arg_index: i32, arg_value: i32) -> Result<(), XRTError> {
-        if unsafe { xrtRunSetArg(self.run_handle, arg_index, arg_value) } != 0 {
-            return Err(XRTError::RunArgumentSetError(arg_index, arg_value));
+        for (index, value) in self.argument_data {
+            match value {
+                Argument::Direct(data) => { 
+                    let result = unsafe { xrtRunSetArg(self.run_handle, index as i32) };
+                    if result != 0 {
+                        return Err(XRTError::RunArgumentSetError(index, data));
+                    }
+                },
+
+                Argument::BufferContent(data) =>  {
+                    // Get the buffer handle
+                    let buffer_handle_result = self.argument_mapping.get(&index).ok_or(XRTError::InvalidArgumentIndex)?;
+                    let buffer_handle = match buffer_handle_result {
+                        ArgumentType::Buffer(bhdl) => *bhdl,
+                        _ => return Err(XRTError::ExpectedBufferArgumentType)
+                    };
+
+                    // Write data to fpga
+                    let write_result = unsafe { xrtBOWrite(buffer_handle, data.as_ptr() as *mut std::os::raw::c_void, data.len(), 0) };
+                    if write_result != 0 {
+                        return Err(XRTError::FailedBOWrite);
+                    }
+
+                    // Sync to FPGA
+                    let sync_result = unsafe { xrtBOSync(buffer_handle, xclBOSyncDirection_XCL_BO_SYNC_BO_TO_DEVICE, data.len(), 0) };
+                    if sync_result != 0 {
+                        return Err(XRTError::FailedBOSyncToDevice);
+                    }
+                }
+            }
         }
         Ok(())
     }
@@ -155,16 +194,16 @@ impl XRTRun {
 }
 
 #[allow(dead_code)]
-pub struct XRTDevice {
+pub struct XRTDevice<'a> {
     device_handle: Option<xrtDeviceHandle>,
     xclbin_handle: Option<xrtXclbinHandle>,
     xclbin_uuid: Option<xuid_t>,
     kernel_handles: HashMap<String, XRTKernel>,
-    run_handles: HashMap<String, Vec<Rc<XRTRun>>>,
+    run_handles: HashMap<String, Vec<Rc<XRTRun<'a>>>>,
 }
 
 // TODO: Make generic for all types that implement Num Trait
-impl TryFrom<u32> for XRTDevice {
+impl TryFrom<u32> for XRTDevice<'_> {
     type Error = XRTError;
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         let dh = XRTDevice {
@@ -182,9 +221,9 @@ impl TryFrom<u32> for XRTDevice {
 }
 
 #[allow(dead_code)]
-impl XRTDevice {
+impl<'a> XRTDevice<'a> {
     // -- Builder Interface --
-    pub fn from_index(index: u32) -> Result<XRTDevice, XRTError> {
+    pub fn from_index(index: u32) -> Result<XRTDevice<'a>, XRTError> {
         XRTDevice::try_from(index)
     }
 
@@ -270,7 +309,7 @@ impl XRTDevice {
     }
 
     /// Load a kernel by name. This name is then used to store it in a XRTRSDevice internal hashmap
-    fn load_kernel(self: &mut XRTDevice, name: &str, initial_argument_mapping: HashMap<ArgumentIndex, ArgumentType>) -> Result<(), XRTError> {
+    fn load_kernel(&mut self, name: &str, initial_argument_mapping: HashMap<ArgumentIndex, ArgumentType>) -> Result<(), XRTError> {
         // If XCLBIN and UUID are set, load and store a handle to the specified kernel by it's name
         let raw_kernel_name =
             std::ffi::CString::new(name).expect("Error on creation of kernel name string!");
@@ -335,11 +374,9 @@ impl XRTDevice {
     }
 
 
-    /// Creates a run for a given kernel. Errors if no such kernel exists
-    pub fn run_kernel(start_directly: bool) {}
 }
 
-impl Drop for XRTDevice {
+impl Drop for XRTDevice<'_> {
     fn drop(&mut self) {
         // TODO: Deallocate any buffers
         // Close runs
