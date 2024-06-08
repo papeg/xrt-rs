@@ -1,4 +1,4 @@
-.PHONY: xclbin clean
+.PHONY: xclbin clean test memcheck
 
 TARGET := hw
 PLATFORM := xilinx_u280_gen3x16_xdma_1_202211_1
@@ -15,10 +15,11 @@ add_$(TARGET).xo: ./add.cpp
 add_$(TARGET).xclbin: add_$(TARGET).xo
 	v++ $(LINK_FLAGS) --temp_dir _x_add_xclbin --output $@ add_$(TARGET).xo
 
-
 test: add_$(TARGET).xclbin
-	cargo test
+	XCL_EMULATION_MODE=$(TARGET) cargo test -- test-threads=1 --nocapture
 
+memcheck: add_$(TARGET).xclbin
+	XCL_EMULATION_MODE=$(TARGET) valgrind --tool=memcheck --leak-check=full -- cargo test -- --test-threads=1 --quiet
 
 clean:
 	git clean -Xdf
