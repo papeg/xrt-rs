@@ -71,9 +71,15 @@ fn run_kernel_raw() {
 
     let arg: u32 = 1;
 
-    assert_eq!(unsafe { xrtRunSetArg(add_kernel_run_handle, 0, arg as std::ffi::c_uint) }, 0,);
+    assert_eq!(
+        unsafe { xrtRunSetArg(add_kernel_run_handle, 0, arg as std::ffi::c_uint) },
+        0,
+    );
 
-    assert_eq!(unsafe { xrtRunSetArg(add_kernel_run_handle, 1, arg as std::ffi::c_uint) }, 0,);
+    assert_eq!(
+        unsafe { xrtRunSetArg(add_kernel_run_handle, 1, arg as std::ffi::c_uint) },
+        0,
+    );
 
     let group_id_handle: std::os::raw::c_int = unsafe { xrtKernelArgGroupId(add_kernel_handle, 2) };
 
