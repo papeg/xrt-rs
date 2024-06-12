@@ -19,7 +19,7 @@ test: add_$(TARGET).xclbin
 	XCL_EMULATION_MODE=$(TARGET) cargo test -- test-threads=1 --nocapture
 
 memcheck: add_$(TARGET).xclbin
-	XCL_EMULATION_MODE=$(TARGET) valgrind --tool=memcheck --leak-check=full -- cargo test -- --test-threads=1 --quiet
+	XCL_EMULATION_MODE=$(TARGET) VALGRINDFLAGS="--tool=memcheck --leak-check=full" cargo valgrind test test -- --test-threads=1
 
 clean:
 	git clean -Xdf
