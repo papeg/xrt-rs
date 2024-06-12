@@ -1,8 +1,8 @@
 include!("../bindings_c.rs");
-use std::{collections::HashMap, hash::Hash, os::raw::c_void, rc::*};
 use crate::components::common::*;
-use crate::components::run::*;
 use crate::components::kernel::*;
+use crate::components::run::*;
+use std::{collections::HashMap, hash::Hash, rc::Rc};
 
 #[allow(dead_code)]
 pub struct XRTDevice<'a> {
@@ -43,7 +43,11 @@ impl<'a> XRTDevice<'a> {
         Ok(self)
     }
 
-    pub fn with_kernel(mut self, name: String, argument_mapping: HashMap<ArgumentIndex, ArgumentType>) -> Result<XRTDevice<'a>, XRTError> {
+    pub fn with_kernel(
+        mut self,
+        name: String,
+        argument_mapping: HashMap<ArgumentIndex, ArgumentType>,
+    ) -> Result<XRTDevice<'a>, XRTError> {
         self.load_kernel(name, argument_mapping)?;
         Ok(self)
     }
@@ -124,7 +128,11 @@ impl<'a> XRTDevice<'a> {
     }
 
     /// Load a kernel by name. This name is then used to store it in a XRTRSDevice internal hashmap
-    pub fn load_kernel(&mut self, name: String, initial_argument_mapping: HashMap<ArgumentIndex, ArgumentType>) -> Result<(), XRTError> {
+    pub fn load_kernel(
+        &mut self,
+        name: String,
+        initial_argument_mapping: HashMap<ArgumentIndex, ArgumentType>,
+    ) -> Result<(), XRTError> {
         // If XCLBIN and UUID are set, load and store a handle to the specified kernel by it's name
         let raw_kernel_name =
             std::ffi::CString::new(name.clone()).expect("Error on creation of kernel name string!");
@@ -149,32 +157,29 @@ impl<'a> XRTDevice<'a> {
             return Err(XRTError::KernelCreationError);
         }
 
-
         // Creating necessary buffer objects
         let mut argument_mapping: HashMap<ArgumentIndex, ArgumentType> = HashMap::new();
-        for (k,v) in initial_argument_mapping {
+        for (k, v) in initial_argument_mapping {
             if let ArgumentType::NotRealizedBuffer(required_size, iomode) = v {
-                let group_id_handle = unsafe { 
-                    xrtKernelArgGroupId(kernel_handle, k as i32) 
-                }; 
-                
+                let group_id_handle = unsafe { xrtKernelArgGroupId(kernel_handle, k as i32) };
+
                 if group_id_handle < 0 {
                     return Err(XRTError::InvalidGroupIDError);
                 }
 
-                let bo_handle = unsafe { 
+                let bo_handle = unsafe {
                     xrtBOAlloc(
-                        self.device_handle.unwrap(), 
-                        required_size as usize, 
-                        XCL_BO_FLAGS_NONE as std::os::raw::c_ulong, 
-                        group_id_handle as std::os::raw::c_uint
+                        self.device_handle.unwrap(),
+                        required_size as usize,
+                        XCL_BO_FLAGS_NONE as std::os::raw::c_ulong,
+                        group_id_handle as std::os::raw::c_uint,
                     )
                 };
 
                 if is_null(bo_handle) {
                     return Err(XRTError::FailedBOAllocError);
                 }
-                
+
                 if let IOMode::Input = iomode {
                     argument_mapping.insert(k, ArgumentType::InputBuffer(bo_handle));
                 } else if let IOMode::Output = iomode {
@@ -190,8 +195,6 @@ impl<'a> XRTDevice<'a> {
         self.kernel_handles.insert(name.to_string(), xrtkernel);
         Ok(())
     }
-
-
 }
 
 impl Drop for XRTDevice<'_> {
@@ -202,7 +205,7 @@ impl Drop for XRTDevice<'_> {
         //? Necessary or automatic? Run <- Kernel <- Device
         //for kernel in self.kernel_handles.into_values() {
         //    std::mem::drop(kernel);
-       // }
+        // }
 
         // Make sure to not try to close a non-open device
         if self.device_handle.is_some() {

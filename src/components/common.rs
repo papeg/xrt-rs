@@ -1,7 +1,5 @@
 include!("../bindings_c.rs");
-use std::{os::raw::c_void, rc::*};
-
-
+use std::os::raw::c_void;
 
 /// Helper func to return if a given handle is null
 pub fn is_null(handle: *mut c_void) -> bool {
@@ -77,7 +75,7 @@ pub type ArgumentIndex = u32;
 
 pub enum IOMode {
     Input,
-    Output
+    Output,
 }
 
 /// Used to store the mapping of arguments per kernel. It defines an argument to either be taken as a buffer address/handle (returned from xrtKernelArgGroupId)
@@ -86,12 +84,12 @@ pub enum ArgumentType {
     InputBuffer(xrtBufferHandle),
     OutputBuffer(xrtBufferHandle),
     Passed,
-    NotRealizedBuffer(u32, IOMode) // Represents a not yet initialized buffer of the given u32 size. A valid mapping of a kernel does not contain this variant
+    NotRealizedBuffer(u32, IOMode), // Represents a not yet initialized buffer of the given u32 size. A valid mapping of a kernel does not contain this variant
 }
 
 /// This enum is used to store how the argument is supposed to be used when creating a run. The difference to `ArgumentType` is, that
 /// this one specifies the arguments for a run, but `ArgumentType` specifies for which arguments a buffer to create and what their handle is
 pub enum Argument {
     Direct(i32),
-    BufferContent(Vec<i8>)
+    BufferContent(Vec<i8>),
 }
