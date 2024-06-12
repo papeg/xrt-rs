@@ -20,11 +20,9 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 #![allow(improper_ctypes)]
-include!("bindings_c.rs");
-// tests for cpp bindings are failing
-//include!("bindings_cpp.rs");
 
 pub mod components;
+pub mod ffi;
 
 pub fn get_xclbin_path(name: &str) -> String {
     let mode = match std::env::var("XCL_EMULATION_MODE") {
@@ -37,6 +35,8 @@ pub fn get_xclbin_path(name: &str) -> String {
 
 #[test]
 fn run_kernel_raw() {
+    use crate::ffi::*;
+
     let device_handle: xrtDeviceHandle = unsafe { xrtDeviceOpen(0) };
 
     assert_ne!(

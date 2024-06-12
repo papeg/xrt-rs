@@ -1,6 +1,6 @@
-include!("../bindings_c.rs");
-use crate::components::common::*;
-use std::{collections::HashMap, hash::Hash, os::raw::c_void};
+use crate::components::common::{Argument, ArgumentIndex, ArgumentType, ERTCommandState, XRTError};
+use crate::ffi::*;
+use std::{collections::HashMap, os::raw::c_void};
 
 /// Struct to manage runs. Creating a run does not start it. The current state of a given run can be checked on.
 /// **Key idea** is to give the data to synchronize directly to a run instead of the buffers. When the run is started it can automatically

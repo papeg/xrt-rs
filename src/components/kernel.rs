@@ -1,7 +1,11 @@
-include!("../bindings_c.rs");
-use crate::components::common::*;
-use crate::components::run::*;
-use std::{collections::HashMap, hash::Hash};
+use crate::ffi::*;
+use std::collections::HashMap;
+
+use crate::components::common::{
+    is_null, Argument, ArgumentIndex, ArgumentType, ERTCommandState, XRTError,
+};
+
+use crate::components::run::XRTRun;
 
 pub struct XRTKernel {
     kernel_handle: xrtKernelHandle,

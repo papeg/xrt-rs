@@ -1,6 +1,6 @@
-include!("../bindings_c.rs");
 use std::os::raw::c_void;
 
+use crate::ffi::*;
 /// Helper func to return if a given handle is null
 pub fn is_null(handle: *mut c_void) -> bool {
     handle == (std::ptr::null::<std::os::raw::c_void>() as *mut std::os::raw::c_void)
