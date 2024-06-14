@@ -36,8 +36,11 @@ pub fn get_xclbin_path(name: &str) -> String {
     format!("{}_{}.xclbin", name, mode)
 }
 
+
 #[test]
 fn simple_add_test() -> Result<(), XRTError> {
+    std::env::set_var("XCL_EMULATION_MODE", "sw_emu");
+
     let mut device = XRTDevice::from_index(0).expect("Wrong device");
     device.load_xclbin(get_xclbin_path("add").as_str()).expect("xclbin err");
     let add_kernel = XRTKernel::new("add", &device).expect("Kernel error");
