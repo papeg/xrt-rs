@@ -3,7 +3,6 @@ use xrt::utils::get_xclbin_path;
 
 #[test]
 fn run_kernel_raw() {
-
     let device_handle: xrtDeviceHandle = unsafe { xrtDeviceOpen(0) };
 
     assert_ne!(
@@ -11,8 +10,8 @@ fn run_kernel_raw() {
         std::ptr::null::<std::os::raw::c_void>() as *mut std::os::raw::c_void
     );
 
-    let xclbin_path =
-        std::ffi::CString::new(get_xclbin_path("./hls/add")).expect("creating CString for xclbin_path");
+    let xclbin_path = std::ffi::CString::new(get_xclbin_path("./hls/vscale_u32"))
+        .expect("creating CString for xclbin_path");
 
     let xclbin_handle = unsafe { xrtXclbinAllocFilename(xclbin_path.as_ptr() as *const i8) };
 
@@ -33,7 +32,8 @@ fn run_kernel_raw() {
         0,
     );
 
-    let kernel_name = std::ffi::CString::new("add").expect("creating CString for kernel name");
+    let kernel_name =
+        std::ffi::CString::new("vscale_u32").expect("creating CString for kernel name");
 
     let add_kernel_handle: xrtKernelHandle = unsafe {
         xrtPLKernelOpen(
@@ -55,33 +55,76 @@ fn run_kernel_raw() {
         std::ptr::null::<std::os::raw::c_void>() as *mut std::os::raw::c_void
     );
 
-    let arg: u32 = 1;
-
     assert_eq!(
-        unsafe { xrtRunSetArg(add_kernel_run_handle, 0, arg as std::ffi::c_uint) },
+        unsafe { xrtRunSetArg(add_kernel_run_handle, 0, 16 as std::ffi::c_uint) },
         0,
     );
 
     assert_eq!(
-        unsafe { xrtRunSetArg(add_kernel_run_handle, 1, arg as std::ffi::c_uint) },
+        unsafe { xrtRunSetArg(add_kernel_run_handle, 1, 6 as std::ffi::c_uint) },
         0,
     );
 
-    let group_id_handle: std::os::raw::c_int = unsafe { xrtKernelArgGroupId(add_kernel_handle, 2) };
+    let mut input: [u32; 16] = [7; 16];
+    let input_ptr: *mut u32 = &mut input[0];
 
-    assert!(group_id_handle >= 0);
+    let input_group_id: std::os::raw::c_int = unsafe { xrtKernelArgGroupId(add_kernel_handle, 2) };
 
-    let return_buffer_handle: xrtBufferHandle = unsafe {
+    assert!(input_group_id >= 0);
+
+    let input_buffer_handle: xrtBufferHandle = unsafe {
         xrtBOAlloc(
             device_handle,
-            4,
+            16 * 4,
             XCL_BO_FLAGS_NONE as std::os::raw::c_ulong,
-            group_id_handle as std::os::raw::c_uint,
+            input_group_id as std::os::raw::c_uint,
         )
     };
 
     assert_eq!(
-        unsafe { xrtRunSetArg(add_kernel_run_handle, 2, return_buffer_handle) },
+        unsafe {
+            xrtBOWrite(
+                input_buffer_handle,
+                input_ptr as *mut std::os::raw::c_void,
+                16 * 4,
+                0,
+            )
+        },
+        0,
+    );
+
+    assert_eq!(
+        unsafe {
+            xrtBOSync(
+                input_buffer_handle,
+                xclBOSyncDirection_XCL_BO_SYNC_BO_TO_DEVICE,
+                16 * 4,
+                0,
+            )
+        },
+        0,
+    );
+
+    assert_eq!(
+        unsafe { xrtRunSetArg(add_kernel_run_handle, 2, input_buffer_handle) },
+        0,
+    );
+
+    let output_group_id: std::os::raw::c_int = unsafe { xrtKernelArgGroupId(add_kernel_handle, 3) };
+
+    assert!(output_group_id >= 0);
+
+    let output_buffer_handle: xrtBufferHandle = unsafe {
+        xrtBOAlloc(
+            device_handle,
+            16 * 4,
+            XCL_BO_FLAGS_NONE as std::os::raw::c_ulong,
+            output_group_id as std::os::raw::c_uint,
+        )
+    };
+
+    assert_eq!(
+        unsafe { xrtRunSetArg(add_kernel_run_handle, 3, output_buffer_handle) },
         0,
     );
 
@@ -95,34 +138,43 @@ fn run_kernel_raw() {
     assert_eq!(
         unsafe {
             xrtBOSync(
-                return_buffer_handle,
+                output_buffer_handle,
                 xclBOSyncDirection_XCL_BO_SYNC_BO_FROM_DEVICE,
-                4,
+                16 * 4,
                 0,
             )
         },
         0,
     );
 
-    let mut result: u32 = 0;
-    let result_ptr: *mut u32 = &mut result;
+    let mut output: [u32; 16] = [0; 16];
+    let output_ptr: *mut u32 = &mut output[0];
     assert_eq!(
         unsafe {
             xrtBORead(
-                return_buffer_handle,
-                result_ptr as *mut std::os::raw::c_void,
-                4,
+                output_buffer_handle,
+                output_ptr as *mut std::os::raw::c_void,
+                16 * 4,
                 0,
             )
         },
         0,
     );
 
-    assert_eq!(result, 2);
+    for elem in output {
+        assert_eq!(elem, 6 * 7);
+    }
 
     assert_eq! {
         unsafe {
-            xrtBOFree(return_buffer_handle)
+            xrtBOFree(output_buffer_handle)
+        },
+        0,
+    }
+
+    assert_eq! {
+        unsafe {
+            xrtBOFree(input_buffer_handle)
         },
         0,
     }

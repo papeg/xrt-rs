@@ -21,10 +21,10 @@
 #![allow(non_snake_case)]
 #![allow(improper_ctypes)]
 
-pub mod ffi;
 pub mod buffer;
-pub mod error;
 pub mod device;
+pub mod error;
+pub mod ffi;
 pub mod kernel;
 pub mod run;
 pub mod utils;

@@ -1,6 +1,6 @@
 target
 
-_x_add*
+_x_vscale*
 *.xo*
 *.xclbin*
 *.log
@@ -8,3 +8,4 @@ _x_add*
 .ipcache
 .run
 *.ltx
+*.link_summary

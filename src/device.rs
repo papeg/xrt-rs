@@ -1,7 +1,7 @@
 use crate::ffi::*;
 
-use crate::{Error, Result};
 use crate::utils::is_null;
+use crate::{Error, Result};
 
 pub struct XRTDevice {
     handle: Option<xrtDeviceHandle>,

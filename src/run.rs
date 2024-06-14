@@ -1,7 +1,7 @@
-use crate::{Result, Error};
-use crate::utils::is_null;
-use crate::kernel::XRTKernel;
 use crate::ffi::*;
+use crate::kernel::XRTKernel;
+use crate::utils::is_null;
+use crate::{Error, Result};
 
 /// Every state value that a run can have. These are ususally parsed from the u32 returned from the C-interface
 #[derive(Debug, PartialEq)]
@@ -42,20 +42,14 @@ impl From<u32> for ERTCommandState {
     }
 }
 
-
 pub struct XRTRun {
     handle: Option<xrtRunHandle>,
 }
 
 impl XRTRun {
     pub fn new(kernel: &XRTKernel) -> Result<Self> {
-        let handle = unsafe {
-            xrtRunOpen(
-                kernel
-                    .get_handle()
-                    .ok_or(Error::KernelNotLoadedYetError)?,
-            )
-        };
+        let handle =
+            unsafe { xrtRunOpen(kernel.get_handle().ok_or(Error::KernelNotLoadedYetError)?) };
         if is_null(handle) {
             return Err(Error::RunCreationError);
         }
