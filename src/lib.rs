@@ -114,7 +114,7 @@ fn run_kernel_raw() {
     };
 
     assert_eq!(
-        unsafe { xrtRunSetArg(add_kernel_run_handle, group_id_handle, return_buffer_handle) },
+        unsafe { xrtRunSetArg(add_kernel_run_handle, 2, return_buffer_handle) },
         0,
     );
 
@@ -137,18 +137,21 @@ fn run_kernel_raw() {
         0,
     );
 
-    /*
     let mut result: u32 = 0;
     let result_ptr: *mut u32 = &mut result;
     assert_eq!(
         unsafe {
-            xrtBORead(return_buffer_handle, result_ptr as *mut std::os::raw::c_void, 4, 0)
+            xrtBORead(
+                return_buffer_handle,
+                result_ptr as *mut std::os::raw::c_void,
+                4,
+                0,
+            )
         },
         0,
     );
 
     assert_eq!(result, 2);
-    */
 
     assert_eq! {
         unsafe {
