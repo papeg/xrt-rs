@@ -22,8 +22,6 @@
 #![allow(non_snake_case)]
 #![allow(improper_ctypes)]
 
-// tests for cpp bindings are failing
-//include!("bindings_cpp.rs");
 pub mod components;
 pub mod ffi;
 
