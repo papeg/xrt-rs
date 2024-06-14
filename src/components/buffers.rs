@@ -29,7 +29,7 @@ impl XRTBuffer {
     pub fn new(
         device: &XRTDevice,
         size: usize,
-        flags: c_ulong,
+        flags: u32,
         memory_group: i32,
     ) -> Result<Self, XRTError> {
         if device.get_handle().is_none() {
@@ -39,7 +39,7 @@ impl XRTBuffer {
             xrtBOAlloc(
                 device.get_handle().unwrap(),
                 size,
-                flags,
+                flags as u64,
                 memory_group as u32,
             )
         };

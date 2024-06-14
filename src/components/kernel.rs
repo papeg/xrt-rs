@@ -9,6 +9,7 @@ pub struct XRTKernel {
 impl XRTKernel {
     pub fn new(name: &str, device: &XRTDevice) -> Result<Self, XRTError> {
         if !device.is_ready() {
+            // TODO: Maybe use XclbinNotLoadedError instead? To be more precise
             return Err(XRTError::DeviceNotReadyError);
         }
 
