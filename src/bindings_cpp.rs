@@ -52,7 +52,13 @@ pub type std_pair__PCCP = u8;
 pub type std_pair__PCCFP = u8;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct std_less {
+pub struct std_pair___zero_as_null_pointer_constant {
+    pub _address: u8,
+}
+pub type std_string = [u64; 4usize];
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct std_char_traits {
     pub _address: u8,
 }
 #[repr(C)]
@@ -75,6 +81,20 @@ pub struct std_allocator_rebind {
 pub type std_allocator_rebind_other = u8;
 pub type std_allocator_propagate_on_container_move_assignment = u8;
 pub type std_allocator_is_always_equal = u8;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct std_less {
+    pub _address: u8,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct std_shared_ptr {
+    pub _address: u8,
+}
+pub type std_shared_ptr__Constructible = u8;
+pub type std_shared_ptr__Assignable = u8;
+pub type std_shared_ptr_element_type = u8;
+pub type std_shared_ptr_weak_type = u8;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct std_vector {
@@ -100,21 +120,12 @@ pub type std_vector_allocator_type = u8;
 pub struct std_vector__Temporary_value {
     pub _address: u8,
 }
-pub type std_string = [u64; 4usize];
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct std_char_traits {
-    pub _address: u8,
+#[repr(align(1))]
+#[derive(Copy, Clone)]
+pub union std_vector__Temporary_value__Storage {
+    pub _bindgen_opaque_blob: u8,
 }
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct std_shared_ptr {
-    pub _address: u8,
-}
-pub type std_shared_ptr__Constructible = u8;
-pub type std_shared_ptr__Assignable = u8;
-pub type std_shared_ptr_element_type = u8;
-pub type std_shared_ptr_weak_type = u8;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct std_map {
@@ -501,12 +512,6 @@ pub struct xrt_xclbin_kernel_impl {
 pub struct xrt_xclbin_kernel {
     pub _bindgen_opaque_blob: [u64; 2usize],
 }
-pub const xrt_xclbin_kernel_kernel_type_none: xrt_xclbin_kernel_kernel_type = 0;
-pub const xrt_xclbin_kernel_kernel_type_pl: xrt_xclbin_kernel_kernel_type = 1;
-pub const xrt_xclbin_kernel_kernel_type_ps: xrt_xclbin_kernel_kernel_type = 2;
-pub const xrt_xclbin_kernel_kernel_type_dpu: xrt_xclbin_kernel_kernel_type = 3;
-#[doc = " @enum kernel_type\n\n The kernel type is extracted from the XML kernel meta data section"]
-pub type xrt_xclbin_kernel_kernel_type = u8;
 #[test]
 fn bindgen_test_layout_xrt_xclbin_kernel() {
     assert_eq!(
@@ -524,13 +529,6 @@ extern "C" {
     #[doc = " get_name() - Get kernel name\n\n @return\n  The name of the kernel"]
     #[link_name = "\u{1}_ZNK3xrt6xclbin6kernel8get_nameB5cxx11Ev"]
     pub fn xrt_xclbin_kernel_get_name(this: *const xrt_xclbin_kernel) -> std_string;
-}
-extern "C" {
-    #[doc = " get_type() - Get kernel type\n\n @return\n  The type of the kernel"]
-    #[link_name = "\u{1}_ZNK3xrt6xclbin6kernel8get_typeEv"]
-    pub fn xrt_xclbin_kernel_get_type(
-        this: *const xrt_xclbin_kernel,
-    ) -> xrt_xclbin_kernel_kernel_type;
 }
 extern "C" {
     #[doc = " get_cus() - Get list of cu from kernel.\n\n @return\n  A list of xrt::xclbin::ip objects corresponding the compute units\n  for this kernel object."]
@@ -572,10 +570,6 @@ impl xrt_xclbin_kernel {
     #[inline]
     pub unsafe fn get_name(&self) -> std_string {
         xrt_xclbin_kernel_get_name(self)
-    }
-    #[inline]
-    pub unsafe fn get_type(&self) -> xrt_xclbin_kernel_kernel_type {
-        xrt_xclbin_kernel_get_type(self)
     }
     #[inline]
     pub unsafe fn get_cus(&self) -> u8 {
@@ -741,7 +735,7 @@ extern "C" {
     pub fn xrt_xclbin_get_axlf(this: *const xrt_xclbin) -> *const axlf;
 }
 extern "C" {
-    #[doc = " xclbin() - Constructor from an xclbin filename\n\n\n @param filename : A path relative or absolute to an xclbin file\n\n If the specified path is an absolute path then the function\n returns this path or throws if file does not exist.  If the path\n is relative, or just a plain file name, then the function check\n first in current directory, then in the platform specific xclbin\n repository.\n\n Throws if file could not be found."]
+    #[doc = " xclbin() - Constructor from an xclbin filename\n\n @param filename\n  Path to the xclbin file\n\n Throws if file not found."]
     #[link_name = "\u{1}_ZN3xrt6xclbinC1ERKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE"]
     pub fn xrt_xclbin_xclbin(this: *mut xrt_xclbin, filename: *const std_string);
 }

@@ -18,7 +18,6 @@
 include!("bindings_c.rs");
 // tests for cpp bindings are failing
 //include!("bindings_cpp.rs");
-pub mod wrapper_tests;
 pub mod components;
 
 pub fn get_xclbin_path(name: &str) -> String {
