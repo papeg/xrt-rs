@@ -1,123 +1,75 @@
-use crate::components::common::{Argument, ArgumentIndex, ArgumentType, ERTCommandState, XRTError};
+use crate::components::common::{is_null, ERTCommandState, XRTError};
+use crate::components::kernel::XRTKernel;
 use crate::ffi::*;
-use std::{collections::HashMap, os::raw::c_void};
 
-/// Struct to manage runs. Creating a run does not start it. The current state of a given run can be checked on.
-/// **Key idea** is to give the data to synchronize directly to a run instead of the buffers. When the run is started it can automatically
-/// transfer the data. The user can advise it to do so at any point as well
-pub struct XRTRun<'a> {
-    run_handle: xrtRunHandle,
-    argument_mapping: &'a HashMap<ArgumentIndex, ArgumentType>, // What kind of arguments and where to sync to
-    argument_data: HashMap<ArgumentIndex, Argument>, // The content of the arguments itself
+pub struct XRTRun {
+    handle: Option<xrtRunHandle>,
 }
 
-/// This impl does not contain a constructor because a valid run can and should only be constructed from a device!
-impl<'a> XRTRun<'a> {
-    /// *Do not create manually, use `XRTKernel::create_run` instead*
-    pub fn new(
-        rhdl: *mut c_void,
-        argument_mapping: &'a HashMap<ArgumentIndex, ArgumentType>,
-        argument_data: HashMap<ArgumentIndex, Argument>,
-    ) -> Self {
-        XRTRun {
-            run_handle: rhdl,
-            argument_mapping: argument_mapping,
-            argument_data: argument_data,
+impl XRTRun {
+    pub fn new(kernel: &XRTKernel) -> Result<Self, XRTError> {
+        let handle = unsafe {
+            xrtRunOpen(
+                kernel
+                    .get_handle()
+                    .ok_or(XRTError::KernelNotLoadedYetError)?,
+            )
+        };
+        if is_null(handle) {
+            return Err(XRTError::RunCreationError);
         }
+        Ok(XRTRun {
+            handle: Some(handle),
+        })
     }
 
-    /// Return the current state of the run
-    pub fn get_state(&self) -> ERTCommandState {
-        let state: u32 = unsafe { xrtRunState(self.run_handle) };
-        ERTCommandState::from(state)
-    }
-
-    /// This sets the direct arguments of the run and fills the buffers with the data and syncs them. If this is done without
-    /// executing the kernel, another XRTRun might do the same and overwrite the data.
-    ///
-    /// __This is manually called by `start_run()`. So in many cases you will want to use that convenience method and
-    /// only use this one in case you need to have more precise control.__
-    pub fn load_arguments(&self) -> Result<(), XRTError> {
-        if self.argument_data.len() != self.argument_mapping.len() {
-            return Err(XRTError::NonMatchingArgumentLists);
+    pub fn set_argument<T>(&mut self, argument_number: u32, value: T) -> Result<(), XRTError> {
+        if self.handle.is_none() {
+            return Err(XRTError::RunNotCreatedYetError);
         }
-
-        for (index, value) in &self.argument_data {
-            match value {
-                Argument::Direct(data) => {
-                    let result = unsafe { xrtRunSetArg(self.run_handle, *index as i32) };
-                    if result != 0 {
-                        return Err(XRTError::RunArgumentSetError(*index, *data));
-                    }
-                }
-
-                Argument::BufferContent(data) => {
-                    // Get the buffer handle
-                    let buffer_handle_result = self
-                        .argument_mapping
-                        .get(&index)
-                        .ok_or(XRTError::InvalidArgumentIndex)?;
-                    let buffer_handle = match buffer_handle_result {
-                        ArgumentType::InputBuffer(bhdl) => *bhdl,
-                        _ => return Err(XRTError::ExpectedInputBufferArgumentType),
-                    };
-
-                    // Write data to buffer
-                    let write_result = unsafe {
-                        xrtBOWrite(
-                            buffer_handle,
-                            data.as_ptr() as *mut std::os::raw::c_void,
-                            data.len(),
-                            0,
-                        )
-                    };
-                    if write_result != 0 {
-                        return Err(XRTError::FailedBOWrite);
-                    }
-
-                    // Sync to FPGA
-                    let sync_result = unsafe {
-                        xrtBOSync(
-                            buffer_handle,
-                            xclBOSyncDirection_XCL_BO_SYNC_BO_TO_DEVICE,
-                            data.len(),
-                            0,
-                        )
-                    };
-                    if sync_result != 0 {
-                        return Err(XRTError::FailedBOSyncToDevice);
-                    }
-                }
-            }
+        let result = unsafe { xrtRunSetArg(self.handle.unwrap(), argument_number as i32, value) };
+        if result != 0 {
+            return Err(XRTError::SetRunArgError);
         }
         Ok(())
     }
 
-    /// Start this run. If given wait until the result is returned. If `load_arguments` is true, the arguments are first loaded
-    /// and written to the buffer and synced. This can be set to false, if the user loaded the argument manually first
-    pub fn start_run(&self, load_arguments: bool, wait: bool) -> Result<ERTCommandState, XRTError> {
-        if load_arguments {
-            self.load_arguments()?;
+    /// Get the current ERTCommandState of the run. Returns an error if called before this run is properly initialized
+    pub fn get_state(&self) -> Result<ERTCommandState, XRTError> {
+        if self.handle.is_none() {
+            return Err(XRTError::RunNotCreatedYetError);
         }
+        Ok(ERTCommandState::from(unsafe {
+            xrtRunState(self.handle.unwrap())
+        }))
+    }
 
-        if unsafe { xrtRunStart(self.run_handle) } != 0 {
-            return Err(XRTError::FailedRunStart);
+    /// Start a run. Optionally wait for the run to finish within the given timeout. If not waiting,
+    /// the timeout is ignored. Returns the Command State after starting / finishing the run
+    pub fn start(&self, wait: bool, wait_timeout_ms: u32) -> Result<ERTCommandState, XRTError> {
+        if self.handle.is_none() {
+            return Err(XRTError::RunNotCreatedYetError);
         }
-
-        if wait {
-            let finished_state = unsafe { xrtRunWait(self.run_handle) };
-            Ok(ERTCommandState::from(finished_state))
-        } else {
-            Ok(self.get_state())
+        let run_res = unsafe { xrtRunStart(self.handle.unwrap()) };
+        if run_res != 0 {
+            return Ok(self.get_state()?); //? Return Ok(state) or an Err? Probably Ok(state) because the state might contain the reason for the failed run start
         }
+        if !wait {
+            return Ok(self.get_state()?);
+        }
+        Ok(ERTCommandState::from(unsafe {
+            xrtRunWaitFor(self.handle.unwrap(), wait_timeout_ms)
+        }))
     }
 }
 
-impl<'a> Drop for XRTRun<'a> {
+impl Drop for XRTRun {
     fn drop(&mut self) {
-        unsafe {
-            xrtRunClose(self.run_handle);
+        if self.handle.is_some() {
+            unsafe {
+                xrtRunClose(self.handle.unwrap());
+            }
+            self.handle = None
         }
-        // TODO: How to handle if this fails?
     }
 }

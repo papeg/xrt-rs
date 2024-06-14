@@ -1,79 +1,60 @@
 use crate::ffi::*;
-use std::collections::HashMap;
-
-use crate::components::common::{
-    is_null, Argument, ArgumentIndex, ArgumentType, ERTCommandState, XRTError,
-};
-
-use crate::components::run::XRTRun;
+use crate::components::common::*;
+use crate::components::device::*;
 
 pub struct XRTKernel {
-    kernel_handle: xrtKernelHandle,
-
-    /// A mapping to describe how a kernel has to be called. For every argument index specifies whether a buffer handle is used (which is prepared at
-    /// construction time of the XRTKernel) or whether it is left blank and requires input from XRT when calling the kernel. This is also
-    /// the reason why this struct doenst need to save the buffer handles explicitly
-    argument_mapping: HashMap<ArgumentIndex, ArgumentType>,
+    handle: Option<xrtKernelHandle>,
 }
 
 impl XRTKernel {
-    /// Construct a new XRTKernel. This guards against acidentally not having initialized all required buffers
-    pub fn new(
-        kernel_handle: xrtKernelHandle,
-        argument_mapping: HashMap<ArgumentIndex, ArgumentType>,
-    ) -> Result<Self, XRTError> {
-        if !XRTKernel::is_ready(&argument_mapping) {
-            return Err(XRTError::UnrealizedBufferError);
+    pub fn new(name: &str, device: &XRTDevice) -> Result<Self, XRTError> {
+        if !device.is_ready() {
+            // TODO: Maybe use XclbinNotLoadedError instead? To be more precise
+            return Err(XRTError::DeviceNotReadyError);
         }
+
+        let kernel_name =
+            std::ffi::CString::new(name).expect("Tried creating CString from kernel name");
+        let handle = unsafe {
+            xrtPLKernelOpen(
+                device.get_handle().unwrap(),
+                device.get_uuid().unwrap().as_mut_ptr(),
+                kernel_name.as_ptr(),
+            )
+        };
+
+        if is_null(handle) {
+            return Err(XRTError::KernelCreationError);
+        }
+
         Ok(XRTKernel {
-            kernel_handle: kernel_handle,
-            argument_mapping: argument_mapping,
+            handle: Some(handle),
         })
     }
 
-    /// Tells whether the XRTKernel is ready for execution. If not, its argument mapping has to be edited
-    pub fn is_ready(argument_mapping: &HashMap<ArgumentIndex, ArgumentType>) -> bool {
-        !argument_mapping
-            .values()
-            .any(|x| matches!(x, ArgumentType::NotRealizedBuffer(_, _)))
+    /// Get the memory group for the buffer that is used as an argument to this kernel. This is needed when creating the buffer object
+    /// whoose pointer is passed to the kernel function
+    pub fn get_memory_group_for_argument(&self, argument_number: u32) -> Result<i32, XRTError> {
+        if self.handle.is_none() {
+            return Err(XRTError::KernelNotLoadedYetError);
+        }
+        let grp = unsafe { xrtKernelArgGroupId(self.handle.unwrap(), argument_number as i32) };
+        if grp < 0 {
+            return Err(XRTError::KernelArgRtrvError);
+        }
+        Ok(grp)
     }
 
-    // Create a run. Doing this does not execute any action. It just prepares the arguments
-    pub fn create_run(
-        &self,
-        argument_data: HashMap<ArgumentIndex, Argument>,
-    ) -> Result<XRTRun, XRTError> {
-        if argument_data.len() != self.argument_mapping.len() {
-            return Err(XRTError::NonMatchingArgumentLists);
-        }
-        let run_handle = unsafe { xrtRunOpen(self.kernel_handle) };
-        if is_null(run_handle) {
-            return Err(XRTError::RunCreationError);
-        }
-        Ok(XRTRun::new(
-            run_handle,
-            &self.argument_mapping,
-            argument_data,
-        ))
+    pub fn get_handle(&self) -> Option<xrtKernelHandle> {
+        self.handle.clone()
     }
 }
 
 impl Drop for XRTKernel {
     fn drop(&mut self) {
-        // Deallocate all buffers
-        for arg in self.argument_mapping.values() {
-            match arg {
-                ArgumentType::InputBuffer(bhdl) | ArgumentType::OutputBuffer(bhdl) => unsafe {
-                    xrtBOFree(*bhdl);
-                },
-                _ => (),
-            }
+        if self.handle.is_some() {
+            unsafe { xrtKernelClose(self.handle.unwrap()) };
+            self.handle = None;
         }
-
-        // Close kernel itself
-        unsafe {
-            xrtKernelClose(self.kernel_handle);
-        }
-        // TODO: What to do if this fails?
     }
 }
