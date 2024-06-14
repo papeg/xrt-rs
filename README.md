@@ -12,7 +12,7 @@ export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$XILINX_XRT"
 ```
 
 ## Usage
-*Currently* the relevant names can be imported from `xrt_rs::components::...`. Every concept from the XRT API has a Rust equivalent (xrtBufferHandle -> XRTBuffer for example, etc.). This may be subject to change.
+*Currently* the relevant names can be imported from `xrt_rs::...`. Every concept from the XRT API has a Rust equivalent (xrtBufferHandle -> XRTBuffer for example, etc.). This may be subject to change.
 
 ## Testing
 Currently the tests can not be run in parallel. 

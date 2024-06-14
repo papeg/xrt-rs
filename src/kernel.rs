@@ -1,6 +1,6 @@
 use crate::ffi::*;
-use crate::components::common::*;
-use crate::components::device::*;
+use crate::common::*;
+use crate::device::*;
 
 pub struct XRTKernel {
     handle: Option<xrtKernelHandle>,

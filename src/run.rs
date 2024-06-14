@@ -1,5 +1,6 @@
-use crate::components::common::{is_null, ERTCommandState, XRTError};
-use crate::components::kernel::XRTKernel;
+use crate::common::{ERTCommandState, XRTError};
+use crate::utils::is_null;
+use crate::kernel::XRTKernel;
 use crate::ffi::*;
 
 pub struct XRTRun {

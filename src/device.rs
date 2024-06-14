@@ -1,6 +1,7 @@
 use crate::ffi::*;
 
-use crate::components::common::{is_null, XRTError};
+use crate::common::XRTError;
+use crate::utils::is_null;
 
 pub struct XRTDevice {
     handle: Option<xrtDeviceHandle>,

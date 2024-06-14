@@ -1,5 +1,5 @@
-use crate::components::common::*;
-use crate::components::device::*;
+use crate::common::*;
+use crate::device::*;
 use crate::ffi::*;
 use std::ffi::c_void;
 
