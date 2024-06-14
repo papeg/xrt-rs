@@ -36,6 +36,11 @@ impl XRTKernel {
         }
         Ok(grp)
     }
+
+
+    pub fn get_handle(&self) -> Option<xrtKernelHandle> {
+        self.handle.clone()
+    }
 }
 
 impl Drop for XRTKernel {

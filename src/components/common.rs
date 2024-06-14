@@ -22,6 +22,9 @@ pub enum XRTError {
     KernelNotLoadedYetError,
     KernelArgRtrvError,
     BOCreationError,
+    RunCreationError,
+    RunNotCreatedYetError,
+    SetRunArgError,
 }
 
 /// Every state value that a run can have. These are ususally parsed from the u32 returned from the C-interface
