@@ -52,6 +52,10 @@ impl XRTBuffer {
         })
     }
 
+    pub fn get_handle(&self) -> Option<xrtBufferHandle> {
+        self.handle.clone()
+    }
+
     /// Sync the BO in the given direction. If size is given use that value, else synchronize the buffer
     pub fn sync(&self, sync_direction: SyncDirection, size: Option<usize>, seek: usize) -> Result<(), XRTError> {
         if self.handle.is_none() {

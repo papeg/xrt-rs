@@ -47,6 +47,7 @@ fn simple_add_test() -> Result<(), XRTError> {
     // Set args
     add_run.set_argument(0, 3).expect("set arg 1 err"); 
     add_run.set_argument(1, 5).expect("set arg 2 err");
+    add_run.set_argument(2, out_buffer.get_handle().unwrap()).expect("set arg 3 err");
 
     // Run
     let result_state = add_run.start(true, 1000).expect("start run err");
