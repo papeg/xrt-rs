@@ -1,22 +1,25 @@
 include!("../bindings_c.rs");
 use crate::components::common::*;
-use crate::components::device::*;
 use crate::components::kernel::*;
 
 pub struct XRTRun {
-    handle: Option<xrtRunHandle>
+    handle: Option<xrtRunHandle>,
 }
 
 impl XRTRun {
     pub fn new(kernel: &XRTKernel) -> Result<Self, XRTError> {
-        let handle = unsafe { 
-            xrtRunOpen(kernel.get_handle().ok_or(XRTError::KernelNotLoadedYetError)?) 
+        let handle = unsafe {
+            xrtRunOpen(
+                kernel
+                    .get_handle()
+                    .ok_or(XRTError::KernelNotLoadedYetError)?,
+            )
         };
         if is_null(handle) {
             return Err(XRTError::RunCreationError);
         }
         Ok(XRTRun {
-            handle: Some(handle)
+            handle: Some(handle),
         })
     }
 
@@ -36,7 +39,9 @@ impl XRTRun {
         if self.handle.is_none() {
             return Err(XRTError::RunNotCreatedYetError);
         }
-        Ok(ERTCommandState::from(unsafe { xrtRunState(self.handle.unwrap()) }))
+        Ok(ERTCommandState::from(unsafe {
+            xrtRunState(self.handle.unwrap())
+        }))
     }
 
     /// Start a run. Optionally wait for the run to finish within the given timeout. If not waiting,
@@ -47,18 +52,15 @@ impl XRTRun {
         }
         let run_res = unsafe { xrtRunStart(self.handle.unwrap()) };
         if run_res != 0 {
-            return Ok(self.get_state()?) //? Return Ok(state) or an Err? Probably Ok(state) because the state might contain the reason for the failed run start
+            return Ok(self.get_state()?); //? Return Ok(state) or an Err? Probably Ok(state) because the state might contain the reason for the failed run start
         }
         if !wait {
             return Ok(self.get_state()?);
         }
-        Ok(
-            ERTCommandState::from(
-                unsafe { xrtRunWaitFor(self.handle.unwrap(), wait_timeout_ms) }
-            )
-        )
+        Ok(ERTCommandState::from(unsafe {
+            xrtRunWaitFor(self.handle.unwrap(), wait_timeout_ms)
+        }))
     }
-
 }
 
 impl Drop for XRTRun {

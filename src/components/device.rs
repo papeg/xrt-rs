@@ -1,11 +1,10 @@
 include!("../bindings_c.rs");
-use std::{os::raw::c_void, rc::*};
 use crate::components::common::*;
 
 pub struct XRTDevice {
     handle: Option<xrtDeviceHandle>,
     xclbin_handle: Option<xrtXclbinHandle>,
-    xclbin_uuid: Option<xuid_t>
+    xclbin_uuid: Option<xuid_t>,
 }
 
 impl TryFrom<u32> for XRTDevice {
@@ -15,22 +14,26 @@ impl TryFrom<u32> for XRTDevice {
         if is_null(handle) {
             return Err(XRTError::DeviceOpenError);
         }
-        Ok(XRTDevice { 
+        Ok(XRTDevice {
             handle: Some(handle),
             xclbin_handle: None,
-            xclbin_uuid: None
+            xclbin_uuid: None,
         })
     }
 }
 
 impl XRTDevice {
     pub fn new() -> Self {
-        XRTDevice { handle: None, xclbin_handle: None, xclbin_uuid: None }
+        XRTDevice {
+            handle: None,
+            xclbin_handle: None,
+            xclbin_uuid: None,
+        }
     }
 
     pub fn from_index(index: u32) -> Result<Self, XRTError> {
         XRTDevice::try_from(index)
-    } 
+    }
 
     pub fn get_handle(&self) -> Option<xrtDeviceHandle> {
         self.handle.clone()
@@ -46,7 +49,7 @@ impl XRTDevice {
         }
         let fpath_converted = match std::ffi::CString::new(path) {
             Ok(val) => val,
-            Err(_) => return Err(XRTError::CStringCreationError)
+            Err(_) => return Err(XRTError::CStringCreationError),
         };
         let xclbin_handle = unsafe { xrtXclbinAllocFilename(fpath_converted.as_ptr()) };
         if is_null(xclbin_handle) {
@@ -61,7 +64,7 @@ impl XRTDevice {
             return Err(XRTError::XclbinUUIDRetrievalError);
         }
 
-        self.xclbin_handle = Some(xclbin_handle); 
+        self.xclbin_handle = Some(xclbin_handle);
         self.xclbin_uuid = Some(uuid);
         Ok(())
     }

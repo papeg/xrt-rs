@@ -1,7 +1,5 @@
 include!("../bindings_c.rs");
-use std::{os::raw::c_void, rc::*};
-
-
+use std::os::raw::c_void;
 
 /// Helper func to return if a given handle is null
 pub fn is_null(handle: *mut c_void) -> bool {
@@ -71,5 +69,5 @@ pub type ArgumentIndex = u32;
 
 pub enum IOMode {
     Input,
-    Output
+    Output,
 }

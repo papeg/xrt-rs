@@ -3,7 +3,7 @@ use crate::components::common::*;
 use crate::components::device::*;
 
 pub struct XRTKernel {
-    handle: Option<xrtKernelHandle>
+    handle: Option<xrtKernelHandle>,
 }
 
 impl XRTKernel {
@@ -12,16 +12,23 @@ impl XRTKernel {
             return Err(XRTError::DeviceNotReadyError);
         }
 
-        let kernel_name = std::ffi::CString::new(name).expect("Tried creating CString from kernel name");
-        let handle = unsafe { 
-            xrtPLKernelOpen(device.get_handle().unwrap(), device.get_uuid().unwrap().as_mut_ptr(), kernel_name.as_ptr()) 
+        let kernel_name =
+            std::ffi::CString::new(name).expect("Tried creating CString from kernel name");
+        let handle = unsafe {
+            xrtPLKernelOpen(
+                device.get_handle().unwrap(),
+                device.get_uuid().unwrap().as_mut_ptr(),
+                kernel_name.as_ptr(),
+            )
         };
-    
+
         if is_null(handle) {
             return Err(XRTError::KernelCreationError);
         }
 
-        Ok(XRTKernel { handle: Some(handle) })
+        Ok(XRTKernel {
+            handle: Some(handle),
+        })
     }
 
     /// Get the memory group for the buffer that is used as an argument to this kernel. This is needed when creating the buffer object
@@ -37,7 +44,6 @@ impl XRTKernel {
         Ok(grp)
     }
 
-
     pub fn get_handle(&self) -> Option<xrtKernelHandle> {
         self.handle.clone()
     }
@@ -46,9 +52,7 @@ impl XRTKernel {
 impl Drop for XRTKernel {
     fn drop(&mut self) {
         if self.handle.is_some() {
-            unsafe {
-                xrtKernelClose(self.handle.unwrap())
-            };
+            unsafe { xrtKernelClose(self.handle.unwrap()) };
         }
     }
 }
