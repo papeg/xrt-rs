@@ -53,6 +53,7 @@ impl Drop for XRTKernel {
     fn drop(&mut self) {
         if self.handle.is_some() {
             unsafe { xrtKernelClose(self.handle.unwrap()) };
+            self.handle = None;
         }
     }
 }

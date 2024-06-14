@@ -23,7 +23,7 @@ impl XRTRun {
         })
     }
 
-    pub fn set_argument(&mut self, argument_number: u32, value: i64) -> Result<(), XRTError> {
+    pub fn set_argument<T>(&mut self, argument_number: u32, value: T) -> Result<(), XRTError> {
         if self.handle.is_none() {
             return Err(XRTError::RunNotCreatedYetError);
         }
@@ -69,6 +69,7 @@ impl Drop for XRTRun {
             unsafe {
                 xrtRunClose(self.handle.unwrap());
             }
+            self.handle = None
         }
     }
 }
