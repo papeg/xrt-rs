@@ -1,6 +1,6 @@
-include!("../bindings_c.rs");
 use crate::components::common::*;
 use crate::components::device::*;
+use crate::ffi::*;
 use std::ffi::c_void;
 
 pub enum SyncDirection {

@@ -47,7 +47,7 @@ fn simple_add_test() -> Result<(), components::common::XRTError> {
     std::env::set_var("XCL_EMULATION_MODE", "sw_emu");
 
     let mut device = XRTDevice::from_index(0).expect("Wrong device");
-    device.load_xclbin(get_xclbin_path("add").as_str()).expect("xclbin err");
+    device.load_xclbin(get_xclbin_path("./hls/add").as_str()).expect("xclbin err");
     let add_kernel = XRTKernel::new("add", &device).expect("Kernel error");
     let mut add_run = XRTRun::new(&add_kernel).expect("Run error"); 
     let out_buffer = XRTBuffer::new(&device, 4, XCL_BO_FLAGS_NONE, add_kernel.get_memory_group_for_argument(2).expect("mem group err")).expect("buffer error");
@@ -83,7 +83,7 @@ fn run_kernel_raw() {
     );
 
     let xclbin_path =
-        std::ffi::CString::new(get_xclbin_path("add")).expect("creating CString for xclbin_path");
+        std::ffi::CString::new(get_xclbin_path("./hls/add")).expect("creating CString for xclbin_path");
 
     let xclbin_handle = unsafe { xrtXclbinAllocFilename(xclbin_path.as_ptr() as *const i8) };
 

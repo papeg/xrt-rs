@@ -13,7 +13,7 @@ fn main() {
         .generate()
         .expect("generating c bindings");
 
-    let c_bindings_out_path = PathBuf::from("./src");
+    let c_bindings_out_path = PathBuf::from("./src/ffi/");
     c_bindings
         .write_to_file(c_bindings_out_path.join("bindings_c.rs"))
         .expect("writing bindings!");
