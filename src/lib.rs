@@ -8,8 +8,9 @@
 //! let mut device = XRTDevice::from_index(0)
 //!     .expect("creating device from index");
 //!
-//! device.load_xclbin("my_xclbin.xclbin")
-//!     .expect("loading xclbin");
+//! //TODO think about out how to write a working example
+//! //device.load_xclbin("my_xclbin.xclbin")
+//! //    .expect("loading xclbin");
 //! ```
 //!
 //! Alternatively, builder-style constructors are also available
@@ -22,8 +23,10 @@
 
 pub mod ffi;
 pub mod buffer;
-pub mod common;
+pub mod error;
 pub mod device;
 pub mod kernel;
 pub mod run;
 pub mod utils;
+
+pub use error::{Error, Result};

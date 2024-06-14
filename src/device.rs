@@ -1,6 +1,6 @@
 use crate::ffi::*;
 
-use crate::common::XRTError;
+use crate::{Error, Result};
 use crate::utils::is_null;
 
 pub struct XRTDevice {
@@ -10,11 +10,11 @@ pub struct XRTDevice {
 }
 
 impl TryFrom<u32> for XRTDevice {
-    type Error = XRTError;
-    fn try_from(value: u32) -> Result<Self, Self::Error> {
+    type Error = Error;
+    fn try_from(value: u32) -> Result<Self> {
         let handle = unsafe { xrtDeviceOpen(value) };
         if is_null(handle) {
-            return Err(XRTError::DeviceOpenError);
+            return Err(Error::DeviceOpenError);
         }
         Ok(XRTDevice {
             handle: Some(handle),
@@ -33,7 +33,7 @@ impl XRTDevice {
         }
     }
 
-    pub fn from_index(index: u32) -> Result<Self, XRTError> {
+    pub fn from_index(index: u32) -> Result<Self> {
         XRTDevice::try_from(index)
     }
 
@@ -45,25 +45,25 @@ impl XRTDevice {
         self.xclbin_uuid.clone()
     }
 
-    pub fn load_xclbin(&mut self, path: &str) -> Result<(), XRTError> {
+    pub fn load_xclbin(&mut self, path: &str) -> Result<()> {
         if let None = self.handle {
-            return Err(XRTError::UnopenedDeviceError);
+            return Err(Error::UnopenedDeviceError);
         }
         let fpath_converted = match std::ffi::CString::new(path) {
             Ok(val) => val,
-            Err(_) => return Err(XRTError::CStringCreationError),
+            Err(_) => return Err(Error::CStringCreationError),
         };
         let xclbin_handle = unsafe { xrtXclbinAllocFilename(fpath_converted.as_ptr()) };
         if is_null(xclbin_handle) {
-            return Err(XRTError::XclbinFileAllocError);
+            return Err(Error::XclbinFileAllocError);
         }
         if unsafe { xrtDeviceLoadXclbinHandle(self.handle.unwrap(), xclbin_handle) } != 0 {
-            return Err(XRTError::XclbinLoadError);
+            return Err(Error::XclbinLoadError);
         }
         let mut uuid: xuid_t = [0; 16];
         let retval = unsafe { xrtXclbinGetUUID(xclbin_handle, uuid.as_mut_ptr()) };
         if retval != 0 {
-            return Err(XRTError::XclbinUUIDRetrievalError);
+            return Err(Error::XclbinUUIDRetrievalError);
         }
 
         self.xclbin_handle = Some(xclbin_handle);

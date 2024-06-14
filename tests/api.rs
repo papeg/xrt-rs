@@ -3,13 +3,13 @@ use xrt::kernel::XRTKernel;
 use xrt::run::XRTRun;
 use xrt::buffer::XRTBuffer;
 use xrt::buffer::SyncDirection;
-use xrt::common::ERTCommandState;
-use xrt::common::XRTError;
+use xrt::run::ERTCommandState;
+use xrt::Result;
 use xrt::ffi::XCL_BO_FLAGS_NONE;
 use xrt::utils::get_xclbin_path;
 
 #[test]
-fn simple_add_test() -> Result<(), XRTError> {
+fn simple_add_test() -> Result<()> {
     std::env::set_var("XCL_EMULATION_MODE", "sw_emu");
 
     let mut device = XRTDevice::from_index(0).expect("Wrong device");

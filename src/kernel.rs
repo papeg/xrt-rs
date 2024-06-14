@@ -1,16 +1,17 @@
 use crate::ffi::*;
-use crate::common::*;
 use crate::device::*;
+use crate::utils::is_null;
+use crate::{Result, Error};
 
 pub struct XRTKernel {
     handle: Option<xrtKernelHandle>,
 }
 
 impl XRTKernel {
-    pub fn new(name: &str, device: &XRTDevice) -> Result<Self, XRTError> {
+    pub fn new(name: &str, device: &XRTDevice) -> Result<Self> {
         if !device.is_ready() {
             // TODO: Maybe use XclbinNotLoadedError instead? To be more precise
-            return Err(XRTError::DeviceNotReadyError);
+            return Err(Error::DeviceNotReadyError);
         }
 
         let kernel_name =
@@ -24,7 +25,7 @@ impl XRTKernel {
         };
 
         if is_null(handle) {
-            return Err(XRTError::KernelCreationError);
+            return Err(Error::KernelCreationError);
         }
 
         Ok(XRTKernel {
@@ -34,13 +35,13 @@ impl XRTKernel {
 
     /// Get the memory group for the buffer that is used as an argument to this kernel. This is needed when creating the buffer object
     /// whoose pointer is passed to the kernel function
-    pub fn get_memory_group_for_argument(&self, argument_number: u32) -> Result<i32, XRTError> {
+    pub fn get_memory_group_for_argument(&self, argument_number: u32) -> Result<i32> {
         if self.handle.is_none() {
-            return Err(XRTError::KernelNotLoadedYetError);
+            return Err(Error::KernelNotLoadedYetError);
         }
         let grp = unsafe { xrtKernelArgGroupId(self.handle.unwrap(), argument_number as i32) };
         if grp < 0 {
-            return Err(XRTError::KernelArgRtrvError);
+            return Err(Error::KernelArgRtrvError);
         }
         Ok(grp)
     }

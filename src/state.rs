@@ -1,34 +1,3 @@
-use std::os::raw::c_void;
-
-use crate::ffi::*;
-/// Helper func to return if a given handle is null
-pub fn is_null(handle: *mut c_void) -> bool {
-    handle == (std::ptr::null::<std::os::raw::c_void>() as *mut std::os::raw::c_void)
-}
-
-#[derive(Debug)]
-pub enum XRTError {
-    GeneralError(String),
-    DeviceOpenError,
-    UnopenedDeviceError,
-    CStringCreationError,
-    XclbinFileAllocError,
-    XclbinLoadError,
-    XclbinUUIDRetrievalError,
-    DeviceNotReadyError,
-    KernelCreationError,
-    KernelNotLoadedYetError,
-    KernelArgRtrvError,
-    BOCreationError,
-    RunCreationError,
-    RunNotCreatedYetError,
-    SetRunArgError,
-    BONotCreatedYet,
-    BOWriteError,
-    BOReadError,
-    BOSyncError,
-}
-
 /// Every state value that a run can have. These are ususally parsed from the u32 returned from the C-interface
 #[derive(Debug, PartialEq)]
 pub enum ERTCommandState {
@@ -68,10 +37,3 @@ impl From<u32> for ERTCommandState {
     }
 }
 
-/// Represents an index of where to put arguments
-pub type ArgumentIndex = u32;
-
-pub enum IOMode {
-    Input,
-    Output,
-}
