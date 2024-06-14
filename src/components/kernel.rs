@@ -23,4 +23,27 @@ impl XRTKernel {
 
         Ok(XRTKernel { handle: Some(handle) })
     }
+
+    /// Get the memory group for the buffer that is used as an argument to this kernel. This is needed when creating the buffer object
+    /// whoose pointer is passed to the kernel function
+    pub fn get_memory_group_for_argument(&self, argument_number: u32) -> Result<i32, XRTError> {
+        if self.handle.is_none() {
+            return Err(XRTError::KernelNotLoadedYetError);
+        }
+        let grp = unsafe { xrtKernelArgGroupId(self.handle.unwrap(), argument_number as i32) };
+        if grp < 0 {
+            return Err(XRTError::KernelArgRtrvError);
+        }
+        Ok(grp)
+    }
+}
+
+impl Drop for XRTKernel {
+    fn drop(&mut self) {
+        if self.handle.is_some() {
+            unsafe {
+                xrtKernelClose(self.handle.unwrap())
+            };
+        }
+    }
 }

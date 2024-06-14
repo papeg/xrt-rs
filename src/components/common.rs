@@ -19,6 +19,9 @@ pub enum XRTError {
     XclbinUUIDRetrievalError,
     DeviceNotReadyError,
     KernelCreationError,
+    KernelNotLoadedYetError,
+    KernelArgRtrvError,
+    BOCreationError,
 }
 
 /// Every state value that a run can have. These are ususally parsed from the u32 returned from the C-interface
