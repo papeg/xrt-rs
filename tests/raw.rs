@@ -1,8 +1,10 @@
 use xrt::ffi::*;
 use xrt::utils::get_xclbin_path;
 
-#[test]
-fn run_kernel_raw() {
+mod data;
+use data::{VScaleTestData, SIZE};
+
+fn run_vscale_raw<T: VScaleTestData + std::fmt::Debug + Copy + std::cmp::PartialEq<T>>() {
     let device_handle: xrtDeviceHandle = unsafe { xrtDeviceOpen(0) };
 
     assert_ne!(
@@ -10,8 +12,9 @@ fn run_kernel_raw() {
         std::ptr::null::<std::os::raw::c_void>() as *mut std::os::raw::c_void
     );
 
-    let xclbin_path = std::ffi::CString::new(get_xclbin_path("./hls/vscale_u32"))
-        .expect("creating CString for xclbin_path");
+    let xclbin_path =
+        std::ffi::CString::new(get_xclbin_path(&format!("./hls/vscale_{}", T::name())))
+            .expect("creating CString for xclbin_path");
 
     let xclbin_handle = unsafe { xrtXclbinAllocFilename(xclbin_path.as_ptr() as *const i8) };
 
@@ -32,8 +35,8 @@ fn run_kernel_raw() {
         0,
     );
 
-    let kernel_name =
-        std::ffi::CString::new("vscale_u32").expect("creating CString for kernel name");
+    let kernel_name = std::ffi::CString::new(format!("vscale_{}", T::name()))
+        .expect("creating CString for kernel name");
 
     let add_kernel_handle: xrtKernelHandle = unsafe {
         xrtPLKernelOpen(
@@ -56,17 +59,17 @@ fn run_kernel_raw() {
     );
 
     assert_eq!(
-        unsafe { xrtRunSetArg(add_kernel_run_handle, 0, 16 as std::ffi::c_uint) },
+        unsafe { xrtRunSetArg(add_kernel_run_handle, 0, SIZE as std::ffi::c_uint) },
         0,
     );
 
     assert_eq!(
-        unsafe { xrtRunSetArg(add_kernel_run_handle, 1, 6 as std::ffi::c_uint) },
+        unsafe { xrtRunSetArg(add_kernel_run_handle, 1, T::scale()) },
         0,
     );
 
-    let mut input: [u32; 16] = [7; 16];
-    let input_ptr: *mut u32 = &mut input[0];
+    let mut input: [T; SIZE] = [T::input(); SIZE];
+    let input_ptr: *mut T = &mut input[0];
 
     let input_group_id: std::os::raw::c_int = unsafe { xrtKernelArgGroupId(add_kernel_handle, 2) };
 
@@ -75,7 +78,7 @@ fn run_kernel_raw() {
     let input_buffer_handle: xrtBufferHandle = unsafe {
         xrtBOAlloc(
             device_handle,
-            16 * 4,
+            SIZE * std::mem::size_of::<T>(),
             XCL_BO_FLAGS_NONE as std::os::raw::c_ulong,
             input_group_id as std::os::raw::c_uint,
         )
@@ -86,7 +89,7 @@ fn run_kernel_raw() {
             xrtBOWrite(
                 input_buffer_handle,
                 input_ptr as *mut std::os::raw::c_void,
-                16 * 4,
+                SIZE * std::mem::size_of::<T>(),
                 0,
             )
         },
@@ -98,7 +101,7 @@ fn run_kernel_raw() {
             xrtBOSync(
                 input_buffer_handle,
                 xclBOSyncDirection_XCL_BO_SYNC_BO_TO_DEVICE,
-                16 * 4,
+                SIZE * std::mem::size_of::<T>(),
                 0,
             )
         },
@@ -117,7 +120,7 @@ fn run_kernel_raw() {
     let output_buffer_handle: xrtBufferHandle = unsafe {
         xrtBOAlloc(
             device_handle,
-            16 * 4,
+            SIZE * std::mem::size_of::<T>(),
             XCL_BO_FLAGS_NONE as std::os::raw::c_ulong,
             output_group_id as std::os::raw::c_uint,
         )
@@ -140,21 +143,21 @@ fn run_kernel_raw() {
             xrtBOSync(
                 output_buffer_handle,
                 xclBOSyncDirection_XCL_BO_SYNC_BO_FROM_DEVICE,
-                16 * 4,
+                SIZE * std::mem::size_of::<T>(),
                 0,
             )
         },
         0,
     );
 
-    let mut output: [u32; 16] = [0; 16];
-    let output_ptr: *mut u32 = &mut output[0];
+    let mut output: [T; SIZE] = [T::zero(); SIZE];
+    let output_ptr: *mut T = &mut output[0];
     assert_eq!(
         unsafe {
             xrtBORead(
                 output_buffer_handle,
                 output_ptr as *mut std::os::raw::c_void,
-                16 * 4,
+                SIZE * std::mem::size_of::<T>(),
                 0,
             )
         },
@@ -162,7 +165,7 @@ fn run_kernel_raw() {
     );
 
     for elem in output {
-        assert_eq!(elem, 6 * 7);
+        assert_eq!(elem, T::output());
     }
 
     assert_eq! {
@@ -199,4 +202,34 @@ fn run_kernel_raw() {
         },
         0,
     };
+}
+
+#[test]
+fn run_vscale_raw_u32() {
+    run_vscale_raw::<u32>();
+}
+
+#[test]
+fn run_vscale_raw_i32() {
+    run_vscale_raw::<i32>();
+}
+
+#[test]
+fn run_vscale_raw_u64() {
+    run_vscale_raw::<u64>();
+}
+
+#[test]
+fn run_vscale_raw_i64() {
+    run_vscale_raw::<i64>();
+}
+
+#[test]
+fn run_vscale_raw_f32() {
+    run_vscale_raw::<f32>();
+}
+
+#[test]
+fn run_vscale_raw_f64() {
+    run_vscale_raw::<f64>();
 }
