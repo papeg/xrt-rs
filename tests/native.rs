@@ -16,7 +16,7 @@ fn run_vscale_native<T: VScaleTestData + std::fmt::Debug + Copy + std::cmp::Part
 ) -> Result<()> {
     std::env::set_var("XCL_EMULATION_MODE", "sw_emu");
 
-    let mut device = XRTDevice::from_index(0)?;
+    let mut device = XRTDevice::try_from(0)?;
     device.load_xclbin(get_xclbin_path(&format!("./hls/vscale_{}", T::name())).as_str())?;
     let add_kernel = XRTKernel::new(&format!("vscale_{}", T::name()), &device)?;
     let mut add_run = XRTRun::new(&add_kernel)?;
@@ -38,10 +38,10 @@ fn run_vscale_native<T: VScaleTestData + std::fmt::Debug + Copy + std::cmp::Part
     in_buffer.sync(SyncDirection::HostToDevice, None, 0)?;
 
     // Set args
-    add_run.set_argument(0, SIZE)?;
-    add_run.set_argument(1, T::scale())?;
-    add_run.set_argument(2, in_buffer.get_handle().unwrap())?;
-    add_run.set_argument(3, out_buffer.get_handle().unwrap())?;
+    add_run.set_scalar_argument(0, SIZE)?;
+    add_run.set_scalar_argument(1, T::scale())?;
+    add_run.set_buffer_argument(2, &in_buffer)?;
+    add_run.set_buffer_argument(3, &out_buffer)?;
 
     // Run
     let result_state = add_run.start(true, 1000)?;

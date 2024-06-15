@@ -4,9 +4,9 @@ use crate::utils::is_null;
 use crate::{Error, Result};
 
 pub struct XRTDevice {
-    handle: Option<xrtDeviceHandle>,
-    xclbin_handle: Option<xrtXclbinHandle>,
-    xclbin_uuid: Option<xuid_t>,
+    pub(crate) handle: Option<xrtDeviceHandle>,
+    pub(crate) xclbin_handle: Option<xrtXclbinHandle>,
+    pub(crate) xclbin_uuid: Option<xuid_t>,
 }
 
 impl TryFrom<u32> for XRTDevice {
@@ -31,18 +31,6 @@ impl XRTDevice {
             xclbin_handle: None,
             xclbin_uuid: None,
         }
-    }
-
-    pub fn from_index(index: u32) -> Result<Self> {
-        XRTDevice::try_from(index)
-    }
-
-    pub fn get_handle(&self) -> Option<xrtDeviceHandle> {
-        self.handle.clone()
-    }
-
-    pub fn get_uuid(&self) -> Option<xuid_t> {
-        self.xclbin_uuid.clone()
     }
 
     pub fn load_xclbin(&mut self, path: &str) -> Result<()> {

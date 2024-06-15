@@ -19,7 +19,7 @@ impl Into<xclBOSyncDirection> for SyncDirection {
 }
 
 pub struct XRTBuffer {
-    handle: Option<xrtBufferHandle>,
+    pub(crate) handle: Option<xrtBufferHandle>,
     size: usize,
 }
 
@@ -27,12 +27,12 @@ impl XRTBuffer {
     /// Create a new buffer. Buffers are bound to devices, but not to kernels. However if used for a kernel as an argument,
     /// the memory group must match. The memory group for a kernel arg can be retrieved via  kernel.get_memory_group_for_argument
     pub fn new(device: &XRTDevice, size: usize, flags: u32, memory_group: i32) -> Result<Self> {
-        if device.get_handle().is_none() {
+        if device.handle.is_none() {
             return Err(Error::UnopenedDeviceError);
         }
         let handle = unsafe {
             xrtBOAlloc(
-                device.get_handle().unwrap(),
+                device.handle.unwrap(),
                 size,
                 flags as u64,
                 memory_group as u32,
@@ -45,10 +45,6 @@ impl XRTBuffer {
             handle: Some(handle),
             size: size,
         })
-    }
-
-    pub fn get_handle(&self) -> Option<xrtBufferHandle> {
-        self.handle.clone()
     }
 
     /// Sync the BO in the given direction. If size is given use that value, else synchronize the buffer

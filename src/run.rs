@@ -1,3 +1,4 @@
+use crate::buffer::XRTBuffer;
 use crate::ffi::*;
 use crate::kernel::XRTKernel;
 use crate::utils::is_null;
@@ -43,7 +44,7 @@ impl From<u32> for ERTCommandState {
 }
 
 pub struct XRTRun {
-    handle: Option<xrtRunHandle>,
+    pub(crate) handle: Option<xrtRunHandle>,
 }
 
 impl XRTRun {
@@ -58,15 +59,30 @@ impl XRTRun {
         })
     }
 
-    pub fn set_argument<T>(&mut self, argument_number: u32, value: T) -> Result<()> {
+    pub fn set_scalar_argument<T>(&mut self, index: i32, value: T) -> Result<()> {
         if self.handle.is_none() {
             return Err(Error::RunNotCreatedYetError);
         }
-        let result = unsafe { xrtRunSetArg(self.handle.unwrap(), argument_number as i32, value) };
+        let result = unsafe { xrtRunSetArg(self.handle.unwrap(), index, value) };
         if result != 0 {
             return Err(Error::SetRunArgError);
         }
         Ok(())
+    }
+
+    pub fn set_buffer_argument(&mut self, index: i32, buffer: &XRTBuffer) -> Result<()> {
+        if self.handle.is_none() {
+            return Err(Error::RunNotCreatedYetError);
+        }
+        if let Some(handle) = buffer.handle {
+            let result = unsafe { xrtRunSetArg(self.handle.unwrap(), index, handle) };
+            if result != 0 {
+                return Err(Error::SetRunArgError);
+            }
+            Ok(())
+        } else {
+            return Err(Error::BONotCreatedYet);
+        }
     }
 
     /// Get the current ERTCommandState of the run. Returns an error if called before this run is properly initialized

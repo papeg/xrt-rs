@@ -4,7 +4,7 @@ use crate::utils::is_null;
 use crate::{Error, Result};
 
 pub struct XRTKernel {
-    handle: Option<xrtKernelHandle>,
+    pub(crate) handle: Option<xrtKernelHandle>,
 }
 
 impl XRTKernel {
@@ -18,8 +18,8 @@ impl XRTKernel {
             std::ffi::CString::new(name).expect("Tried creating CString from kernel name");
         let handle = unsafe {
             xrtPLKernelOpen(
-                device.get_handle().unwrap(),
-                device.get_uuid().unwrap().as_mut_ptr(),
+                device.handle.unwrap(),
+                device.xclbin_uuid.unwrap().as_mut_ptr(),
                 kernel_name.as_ptr(),
             )
         };
