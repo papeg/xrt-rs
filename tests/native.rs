@@ -44,7 +44,9 @@ fn run_vscale_native<T: VScaleTestData + std::fmt::Debug + Copy + std::cmp::Part
     add_run.set_buffer_argument(3, &out_buffer)?;
 
     // Run
-    let result_state = add_run.start(true, 1000)?;
+    let _start_state = add_run.start()?;
+
+    let result_state = add_run.wait_for(1000)?;
     assert_eq!(result_state, ERTCommandState::Completed);
 
     // Get back data

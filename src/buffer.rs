@@ -54,73 +54,74 @@ impl XRTBuffer {
         size: Option<usize>,
         seek: usize,
     ) -> Result<()> {
-        if self.handle.is_none() {
+        if let Some(handle) = self.handle {
+            let used_size = match size {
+                None => self.size,
+                Some(s) => s,
+            };
+            let ret_val = unsafe { xrtBOSync(handle, sync_direction.into(), used_size, seek) };
+
+            // TODO: Implement XRT error code handling: https://github.com/Xilinx/XRT/blob/master/src/runtime_src/core/include/xrt_error_code.h (Returned by some functions to specify what kind of error ocurred) if ret_val != 0 {
+            if ret_val != 0 {
+                return Err(Error::BOSyncError);
+            }
+            Ok(())
+        } else {
             return Err(Error::BONotCreatedYet);
         }
-        let used_size = match size {
-            None => self.size,
-            Some(s) => s,
-        };
-        let ret_val =
-            unsafe { xrtBOSync(self.handle.unwrap(), sync_direction.into(), used_size, seek) };
-
-        // TODO: Implement XRT error code handling: https://github.com/Xilinx/XRT/blob/master/src/runtime_src/core/include/xrt_error_code.h (Returned by some functions to specify what kind of error ocurred) if ret_val != 0 {
-        if ret_val != 0 {
-            return Err(Error::BOSyncError);
-        }
-        Ok(())
     }
 
     /// Write the given datatype into the buffer. Buffer still needs to be synced for the data to show up on the FPGA
     pub fn write<T>(&self, data: &[T], seek: usize) -> Result<()> {
-        if self.handle.is_none() {
+        if let Some(handle) = self.handle {
+            let ret_val = unsafe {
+                xrtBOWrite(
+                    handle,
+                    data.as_ptr() as *const c_void,
+                    data.len() * std::mem::size_of::<T>(),
+                    seek,
+                )
+            };
+
+            // TODO: Implement XRT error code handling: https://github.com/Xilinx/XRT/blob/master/src/runtime_src/core/include/xrt_error_code.h (Returned by some functions to specify what kind of error ocurred) if ret_val != 0 {
+            if ret_val != 0 {
+                return Err(Error::BOWriteError);
+            }
+            Ok(())
+        } else {
             return Err(Error::BONotCreatedYet);
         }
-        let ret_val = unsafe {
-            xrtBOWrite(
-                self.handle.unwrap(),
-                data.as_ptr() as *const c_void,
-                data.len() * std::mem::size_of::<T>(),
-                seek,
-            )
-        };
-
-        // TODO: Implement XRT error code handling: https://github.com/Xilinx/XRT/blob/master/src/runtime_src/core/include/xrt_error_code.h (Returned by some functions to specify what kind of error ocurred) if ret_val != 0 {
-        if ret_val != 0 {
-            return Err(Error::BOWriteError);
-        }
-        Ok(())
     }
 
     /// Inplace reads value from BO into the provided slice
     pub fn read<T>(&self, data: &mut [T], seek: usize) -> Result<()> {
-        if self.handle.is_none() {
+        if let Some(handle) = self.handle {
+            let ret_val = unsafe {
+                xrtBORead(
+                    handle,
+                    data.as_mut_ptr() as *mut c_void,
+                    data.len() * std::mem::size_of::<T>(),
+                    seek,
+                )
+            };
+
+            // TODO: Implement XRT error code handling: https://github.com/Xilinx/XRT/blob/master/src/runtime_src/core/include/xrt_error_code.h (Returned by some functions to specify what kind of error ocurred)
+            if ret_val != 0 {
+                return Err(Error::BOReadError);
+            }
+            Ok(())
+        } else {
             return Err(Error::BONotCreatedYet);
         }
-        let ret_val = unsafe {
-            xrtBORead(
-                self.handle.unwrap(),
-                data.as_mut_ptr() as *mut c_void,
-                data.len() * std::mem::size_of::<T>(),
-                seek,
-            )
-        };
-
-        // TODO: Implement XRT error code handling: https://github.com/Xilinx/XRT/blob/master/src/runtime_src/core/include/xrt_error_code.h (Returned by some functions to specify what kind of error ocurred)
-        if ret_val != 0 {
-            return Err(Error::BOReadError);
-        }
-        Ok(())
     }
 }
 
 impl Drop for XRTBuffer {
     fn drop(&mut self) {
-        if self.handle.is_some() {
+        if let Some(handle) = self.handle {
             unsafe {
-                xrtBOFree(self.handle.unwrap());
+                xrtBOFree(handle);
             }
-            self.handle = None;
         }
     }
 }

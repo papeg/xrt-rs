@@ -49,78 +49,93 @@ pub struct XRTRun {
 
 impl XRTRun {
     pub fn new(kernel: &XRTKernel) -> Result<Self> {
-        let handle =
-            unsafe { xrtRunOpen(kernel.get_handle().ok_or(Error::KernelNotLoadedYetError)?) };
-        if is_null(handle) {
-            return Err(Error::RunCreationError);
+        if let Some(kernel_handle) = kernel.handle {
+            let run_handle = unsafe { xrtRunOpen(kernel_handle) };
+            if is_null(run_handle) {
+                return Err(Error::RunCreationError);
+            }
+            Ok(XRTRun {
+                handle: Some(run_handle),
+            })
+        } else {
+            return Err(Error::KernelNotLoadedYetError);
         }
-        Ok(XRTRun {
-            handle: Some(handle),
-        })
     }
 
     pub fn set_scalar_argument<T>(&mut self, index: i32, value: T) -> Result<()> {
-        if self.handle.is_none() {
-            return Err(Error::RunNotCreatedYetError);
-        }
-        let result = unsafe { xrtRunSetArg(self.handle.unwrap(), index, value) };
-        if result != 0 {
-            return Err(Error::SetRunArgError);
-        }
-        Ok(())
-    }
-
-    pub fn set_buffer_argument(&mut self, index: i32, buffer: &XRTBuffer) -> Result<()> {
-        if self.handle.is_none() {
-            return Err(Error::RunNotCreatedYetError);
-        }
-        if let Some(handle) = buffer.handle {
-            let result = unsafe { xrtRunSetArg(self.handle.unwrap(), index, handle) };
+        if let Some(handle) = self.handle {
+            let result = unsafe { xrtRunSetArg(handle, index, value) };
             if result != 0 {
                 return Err(Error::SetRunArgError);
             }
             Ok(())
         } else {
-            return Err(Error::BONotCreatedYet);
+            return Err(Error::RunNotCreatedYetError);
+        }
+    }
+
+    pub fn set_buffer_argument(&mut self, index: i32, buffer: &XRTBuffer) -> Result<()> {
+        if let Some(run_handle) = self.handle {
+            if let Some(buffer_handle) = buffer.handle {
+                let result = unsafe { xrtRunSetArg(run_handle, index, buffer_handle) };
+                if result != 0 {
+                    return Err(Error::SetRunArgError);
+                }
+                Ok(())
+            } else {
+                return Err(Error::BONotCreatedYet);
+            }
+        } else {
+            return Err(Error::RunNotCreatedYetError);
         }
     }
 
     /// Get the current ERTCommandState of the run. Returns an error if called before this run is properly initialized
     pub fn get_state(&self) -> Result<ERTCommandState> {
-        if self.handle.is_none() {
+        if let Some(handle) = self.handle {
+            Ok(ERTCommandState::from(unsafe { xrtRunState(handle) }))
+        } else {
             return Err(Error::RunNotCreatedYetError);
         }
-        Ok(ERTCommandState::from(unsafe {
-            xrtRunState(self.handle.unwrap())
-        }))
     }
 
     /// Start a run. Optionally wait for the run to finish within the given timeout. If not waiting,
     /// the timeout is ignored. Returns the Command State after starting / finishing the run
-    pub fn start(&self, wait: bool, wait_timeout_ms: u32) -> Result<ERTCommandState> {
-        if self.handle.is_none() {
+    pub fn start(&self) -> Result<ERTCommandState> {
+        if let Some(handle) = self.handle {
+            let run_res = unsafe { xrtRunStart(handle) };
+            if run_res != 0 {
+                return Ok(self.get_state()?); //? Return Ok(state) or an Err? Probably Ok(state) because the state might contain the reason for the failed run start
+            }
+            return Ok(self.get_state()?);
+        } else {
             return Err(Error::RunNotCreatedYetError);
         }
-        let run_res = unsafe { xrtRunStart(self.handle.unwrap()) };
-        if run_res != 0 {
-            return Ok(self.get_state()?); //? Return Ok(state) or an Err? Probably Ok(state) because the state might contain the reason for the failed run start
+    }
+
+    pub fn wait_for(&self, timeout_ms: u32) -> Result<ERTCommandState> {
+        if let Some(handle) = self.handle {
+            Ok(unsafe { ERTCommandState::from(xrtRunWaitFor(handle, timeout_ms)) })
+        } else {
+            Err(Error::RunNotCreatedYetError)
         }
-        if !wait {
-            return Ok(self.get_state()?);
+    }
+
+    pub fn wait(&self) -> Result<ERTCommandState> {
+        if let Some(handle) = self.handle {
+            Ok(unsafe { ERTCommandState::from(xrtRunWait(handle)) })
+        } else {
+            Err(Error::RunNotCreatedYetError)
         }
-        Ok(ERTCommandState::from(unsafe {
-            xrtRunWaitFor(self.handle.unwrap(), wait_timeout_ms)
-        }))
     }
 }
 
 impl Drop for XRTRun {
     fn drop(&mut self) {
-        if self.handle.is_some() {
+        if let Some(handle) = self.handle {
             unsafe {
-                xrtRunClose(self.handle.unwrap());
+                xrtRunClose(handle);
             }
-            self.handle = None
         }
     }
 }

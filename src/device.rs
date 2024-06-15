@@ -25,38 +25,33 @@ impl TryFrom<u32> for XRTDevice {
 }
 
 impl XRTDevice {
-    pub fn new() -> Self {
-        XRTDevice {
-            handle: None,
-            xclbin_handle: None,
-            xclbin_uuid: None,
-        }
-    }
+    // TODO: constructor from PCIe bdf
 
     pub fn load_xclbin(&mut self, path: &str) -> Result<()> {
-        if let None = self.handle {
+        if let Some(handle) = self.handle {
+            let fpath_converted = match std::ffi::CString::new(path) {
+                Ok(val) => val,
+                Err(_) => return Err(Error::CStringCreationError),
+            };
+            let xclbin_handle = unsafe { xrtXclbinAllocFilename(fpath_converted.as_ptr()) };
+            if is_null(xclbin_handle) {
+                return Err(Error::XclbinFileAllocError);
+            }
+            if unsafe { xrtDeviceLoadXclbinHandle(handle, xclbin_handle) } != 0 {
+                return Err(Error::XclbinLoadError);
+            }
+            let mut uuid: xuid_t = [0; 16];
+            let retval = unsafe { xrtXclbinGetUUID(xclbin_handle, uuid.as_mut_ptr()) };
+            if retval != 0 {
+                return Err(Error::XclbinUUIDRetrievalError);
+            }
+
+            self.xclbin_handle = Some(xclbin_handle);
+            self.xclbin_uuid = Some(uuid);
+            Ok(())
+        } else {
             return Err(Error::UnopenedDeviceError);
         }
-        let fpath_converted = match std::ffi::CString::new(path) {
-            Ok(val) => val,
-            Err(_) => return Err(Error::CStringCreationError),
-        };
-        let xclbin_handle = unsafe { xrtXclbinAllocFilename(fpath_converted.as_ptr()) };
-        if is_null(xclbin_handle) {
-            return Err(Error::XclbinFileAllocError);
-        }
-        if unsafe { xrtDeviceLoadXclbinHandle(self.handle.unwrap(), xclbin_handle) } != 0 {
-            return Err(Error::XclbinLoadError);
-        }
-        let mut uuid: xuid_t = [0; 16];
-        let retval = unsafe { xrtXclbinGetUUID(xclbin_handle, uuid.as_mut_ptr()) };
-        if retval != 0 {
-            return Err(Error::XclbinUUIDRetrievalError);
-        }
-
-        self.xclbin_handle = Some(xclbin_handle);
-        self.xclbin_uuid = Some(uuid);
-        Ok(())
     }
 
     pub fn is_ready(&self) -> bool {
@@ -67,14 +62,12 @@ impl XRTDevice {
 impl Drop for XRTDevice {
     fn drop(&mut self) {
         unsafe {
-            if let Some(h) = self.xclbin_handle {
-                xrtXclbinFreeHandle(h);
+            if let Some(handle) = self.xclbin_handle {
+                xrtXclbinFreeHandle(handle);
             }
-            self.xclbin_handle = None;
-            if let Some(h) = self.handle {
-                xrtDeviceClose(h);
+            if let Some(handle) = self.handle {
+                xrtDeviceClose(handle);
             }
-            self.handle = None;
         }
     }
 }
