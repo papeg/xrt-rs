@@ -80,7 +80,7 @@ impl XRTBuffer {
             xrtBOWrite(
                 self.handle.unwrap(),
                 data.as_ptr() as *const c_void,
-                data.len() * 4,
+                data.len() * std::mem::size_of::<T>(),
                 seek,
             )
         };
@@ -101,7 +101,7 @@ impl XRTBuffer {
             xrtBORead(
                 self.handle.unwrap(),
                 data.as_mut_ptr() as *mut c_void,
-                data.len() * 4,
+                data.len() * std::mem::size_of::<T>(),
                 seek,
             )
         };
