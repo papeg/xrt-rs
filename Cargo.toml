@@ -1,7 +1,11 @@
 [package]
 name = "xrt"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
+description = "Wrapper for the Xilinx Runtime Library (XRT)"
+license = "AGPL-3.0-or-later"
+authors = ["Gerrit Pape <mail@gerritpape.de>", "Bjarne Wintermann <bjarne.wintermann@me.com>"]
+repository = "https://github.com/papeg/xrt-rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
