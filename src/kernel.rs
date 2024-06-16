@@ -36,7 +36,7 @@ impl XRTKernel {
         }
     }
 
-    pub fn get_run(&self) -> Result<XRTRun> {
+    pub fn run(&self) -> Result<XRTRun> {
         XRTRun::new(&self)
     }
 

@@ -1,7 +1,4 @@
-use xrt::buffer::SyncDirection;
-use xrt::buffer::XRTBuffer;
 use xrt::device::XRTDevice;
-use xrt::ffi::XCL_BO_FLAGS_NONE;
 use xrt::run::ERTCommandState;
 use xrt::utils::get_xclbin_path;
 use xrt::Result;
@@ -21,30 +18,15 @@ fn run_vscale_simple<T: VScaleTestData + std::fmt::Debug + Copy + std::cmp::Part
         .with_kernel(&kernel_name)?;
 
     let add_kernel = device.kernel(&kernel_name)?;
-    let mut add_run = add_kernel.get_run()?;
-
-    let in_buffer = XRTBuffer::new(
-        &device,
-        SIZE * std::mem::size_of::<T>(),
-        XCL_BO_FLAGS_NONE,
-        add_kernel.get_memory_group_for_argument(2)?,
-    )?;
-    let out_buffer = XRTBuffer::new(
-        &device,
-        SIZE * std::mem::size_of::<T>(),
-        XCL_BO_FLAGS_NONE,
-        add_kernel.get_memory_group_for_argument(3)?,
-    )?;
+    let mut add_run = add_kernel.run()?;
 
     let input: [T; SIZE] = [T::input(); SIZE];
-    in_buffer.write(&input, 0)?;
-    in_buffer.sync(SyncDirection::HostToDevice, None, 0)?;
 
     // Set args
     add_run.set_scalar_argument(0, SIZE)?;
     add_run.set_scalar_argument(1, T::scale())?;
-    add_run.set_buffer_argument(2, &in_buffer)?;
-    add_run.set_buffer_argument(3, &out_buffer)?;
+    add_run.write_buffer_argument(2, &input, &device, &add_kernel)?;
+    add_run.create_read_buffer::<T>(3, SIZE, &device, &add_kernel)?;
 
     // Run
     let _start_state = add_run.start()?;
@@ -53,9 +35,7 @@ fn run_vscale_simple<T: VScaleTestData + std::fmt::Debug + Copy + std::cmp::Part
     assert_eq!(result_state, ERTCommandState::Completed);
 
     // Get back data
-    let mut output: [T; SIZE] = [T::zero(); SIZE];
-    out_buffer.sync(SyncDirection::DeviceToHost, None, 0)?;
-    out_buffer.read(&mut output, 0)?;
+    let output: Vec<T> = add_run.read_buffer_argument(3, SIZE)?;
 
     // Check result
     for elem in output {
