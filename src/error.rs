@@ -1,13 +1,12 @@
 #[derive(Debug)]
 pub enum Error {
-    GeneralError(String),
+    CStringCreationError,
     DeviceOpenError,
     UnopenedDeviceError,
-    CStringCreationError,
+    DeviceNotReadyError,
     XclbinFileAllocError,
     XclbinLoadError,
     XclbinUUIDRetrievalError,
-    DeviceNotReadyError,
     KernelCreationError,
     KernelNotLoadedYetError,
     KernelArgRtrvError,

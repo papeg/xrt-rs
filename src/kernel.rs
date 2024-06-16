@@ -1,5 +1,6 @@
 use crate::device::*;
 use crate::ffi::*;
+use crate::run::XRTRun;
 use crate::utils::is_null;
 use crate::{Error, Result};
 
@@ -14,23 +15,29 @@ impl XRTKernel {
             return Err(Error::DeviceNotReadyError);
         }
 
-        let kernel_name =
-            std::ffi::CString::new(name).expect("Tried creating CString from kernel name");
-        let handle = unsafe {
-            xrtPLKernelOpen(
-                device.handle.unwrap(),
-                device.xclbin_uuid.unwrap().as_mut_ptr(),
-                kernel_name.as_ptr(),
-            )
-        };
+        if let Ok(kernel_name) = std::ffi::CString::new(name) {
+            let handle = unsafe {
+                xrtPLKernelOpen(
+                    device.handle.unwrap(),
+                    device.xclbin_uuid.unwrap().as_mut_ptr(),
+                    kernel_name.as_ptr(),
+                )
+            };
 
-        if is_null(handle) {
-            return Err(Error::KernelCreationError);
+            if is_null(handle) {
+                return Err(Error::KernelCreationError);
+            }
+
+            Ok(XRTKernel {
+                handle: Some(handle),
+            })
+        } else {
+            return Err(Error::CStringCreationError);
         }
+    }
 
-        Ok(XRTKernel {
-            handle: Some(handle),
-        })
+    pub fn get_run(&self) -> Result<XRTRun> {
+        XRTRun::new(&self)
     }
 
     /// Get the memory group for the buffer that is used as an argument to this kernel. This is needed when creating the buffer object
