@@ -11,7 +11,6 @@ pub struct XRTDevice {
     pub(crate) handle: Option<xrtDeviceHandle>,
     pub(crate) xclbin_handle: Option<xrtXclbinHandle>,
     pub(crate) xclbin_uuid: Option<xuid_t>,
-    kernels: HashMap<String, XRTKernel>,
 }
 
 impl TryFrom<u32> for XRTDevice {
@@ -25,7 +24,6 @@ impl TryFrom<u32> for XRTDevice {
             handle: Some(handle),
             xclbin_handle: None,
             xclbin_uuid: None,
-            kernels: HashMap::new(),
         })
     }
 }
@@ -65,17 +63,6 @@ impl XRTDevice {
         Ok(self)
     }
 
-    pub fn with_kernel(mut self, name: &str) -> Result<Self> {
-        if !self.kernels.contains_key(name) {
-            self.kernels
-                .insert(name.into(), XRTKernel::new(name, &self)?);
-        }
-        Ok(self)
-    }
-
-    pub fn kernel(&self, name: &str) -> Result<&XRTKernel> {
-        self.kernels.get(name).ok_or(Error::KernelNotLoadedYetError)
-    }
 
     pub fn is_ready(&self) -> bool {
         self.handle.is_some() && self.xclbin_handle.is_some() && self.xclbin_uuid.is_some()

@@ -28,5 +28,6 @@ pub mod ffi;
 pub mod kernel;
 pub mod run;
 pub mod utils;
+pub mod device_manager;
 
 pub use error::{Error, Result};

@@ -1,7 +1,7 @@
 .PHONY: xclbin clean test memcheck
 
 PLATFORM := xilinx_u280_gen3x16_xdma_1_202211_1
-TARGET := hw
+TARGET := sw_emu
 
 VPP_FLAGS := --platform $(PLATFORM) --target $(TARGET) --save-temps --debug
 COMP_FLAGS := --compile $(VPP_FLAGS)

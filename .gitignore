@@ -9,3 +9,4 @@ _x_vscale*
 .run
 *.ltx
 *.link_summary
+_x_add*

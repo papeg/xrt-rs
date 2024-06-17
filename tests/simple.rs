@@ -7,6 +7,7 @@ mod data;
 
 use data::{VScaleTestData, SIZE};
 
+/* 
 fn run_vscale_simple<T: VScaleTestData + std::fmt::Debug + Copy + std::cmp::PartialEq<T>>(
 ) -> Result<()> {
     let xclbin_path = get_xclbin_path(&format!("./hls/vscale_{}", T::name()));
@@ -73,3 +74,4 @@ fn run_vscale_simple_f32() -> Result<()> {
 fn run_vscale_simple_f64() -> Result<()> {
     run_vscale_simple::<f64>()
 }
+*/

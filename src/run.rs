@@ -47,7 +47,6 @@ impl From<u32> for ERTCommandState {
 
 pub struct XRTRun {
     pub(crate) handle: Option<xrtRunHandle>,
-    internal_buffers: HashMap<i32, XRTBuffer>,
 }
 
 impl XRTRun {
@@ -59,7 +58,6 @@ impl XRTRun {
             }
             Ok(XRTRun {
                 handle: Some(run_handle),
-                internal_buffers: HashMap::new(),
             })
         } else {
             return Err(Error::KernelNotLoadedYetError);
@@ -91,57 +89,6 @@ impl XRTRun {
             }
         } else {
             return Err(Error::RunNotCreatedYetError);
-        }
-    }
-
-    pub fn write_buffer_argument<T>(
-        &mut self,
-        index: i32,
-        values: &[T],
-        device: &XRTDevice,
-        kernel: &XRTKernel,
-    ) -> Result<()> {
-        let buffer = XRTBuffer::new(
-            &device,
-            values.len() * std::mem::size_of::<T>(),
-            XCL_BO_FLAGS_NONE,
-            kernel.get_memory_group_for_argument(index)?,
-        )?;
-
-        buffer.write(values, 0)?;
-        buffer.sync(SyncDirection::HostToDevice, None, 0)?;
-
-        self.internal_buffers.insert(index, buffer);
-
-        Ok(())
-    }
-
-    pub fn create_read_buffer<T>(
-        &mut self,
-        index: i32,
-        size: usize,
-        device: &XRTDevice,
-        kernel: &XRTKernel,
-    ) -> Result<()> {
-        let buffer = XRTBuffer::new(
-            &device,
-            size * std::mem::size_of::<T>(),
-            XCL_BO_FLAGS_NONE,
-            kernel.get_memory_group_for_argument(index)?,
-        )?;
-
-        self.internal_buffers.insert(index, buffer);
-        Ok(())
-    }
-
-    pub fn read_buffer_argument<T>(&mut self, index: i32, size: usize) -> Result<Vec<T>> {
-        if let Some(buffer) = self.internal_buffers.get(&index) {
-            let mut output: Vec<T> = Vec::with_capacity(size);
-            buffer.sync(SyncDirection::DeviceToHost, None, 0)?;
-            buffer.read(&mut output, 0)?;
-            Ok(output)
-        } else {
-            Err(Error::BONotCreatedYet)
         }
     }
 
