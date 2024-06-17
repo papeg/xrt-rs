@@ -1,5 +1,5 @@
 # xrt-rs
-xrt-rs provides a thin wrapper around the C-API of the Xilinx Runtime (XRT) used for communication between AMD FPGAs / AI Engines and their host. The library offers a thin wrapper, that simply translates the C API into safe Rust, as well as a more abstract layers, that automatically takes care of the details to provide an easier to use interface for simpler applications (**TODO**).
+xrt-rs provides a wrapper around the C-API of the Xilinx Runtime (XRT) used for communication between AMD FPGAs / AI Engines and their host. The library offers a thin wrapper (called _native_), that simply translates the C API into safe Rust, as well as a more abstract layer (called _simple_), that automatically takes care of the details to provide an easier to use interface for simpler applications (**TODO**).
 
 ## Installation
 To install simply add this repository or crate as a dependency to your `Cargo.toml`.
