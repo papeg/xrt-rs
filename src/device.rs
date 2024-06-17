@@ -30,6 +30,9 @@ impl TryFrom<u32> for XRTDevice {
 
 impl XRTDevice {
     // TODO: constructor from PCIe bdf
+    pub fn new() -> Self {
+        XRTDevice { handle: None, xclbin_handle: None, xclbin_uuid: None }
+    }
 
     pub fn load_xclbin(&mut self, path: &str) -> Result<()> {
         if let Some(handle) = self.handle {

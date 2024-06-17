@@ -18,6 +18,12 @@ pub enum Error {
     BOWriteError,
     BOReadError,
     BOSyncError,
+
+    // SIMPLE API ERRORS
+    NoSuchKernelError,
+    ArgumentNumberMismatchError,
+    PassVecToScalarArgumentError,
+    NoOpenRunsError,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
