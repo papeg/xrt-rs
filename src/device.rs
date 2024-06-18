@@ -1,11 +1,7 @@
 use crate::ffi::*;
-
 use crate::utils::is_null;
 use crate::{Error, Result};
 
-use crate::kernel::XRTKernel;
-
-use std::collections::HashMap;
 
 pub struct XRTDevice {
     pub(crate) handle: Option<xrtDeviceHandle>,

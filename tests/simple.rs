@@ -1,3 +1,4 @@
+/* 
 use xrt::device::XRTDevice;
 use xrt::run::ERTCommandState;
 use xrt::utils::get_xclbin_path;
@@ -7,7 +8,7 @@ mod data;
 
 use data::{VScaleTestData, SIZE};
 
-/* 
+ 
 fn run_vscale_simple<T: VScaleTestData + std::fmt::Debug + Copy + std::cmp::PartialEq<T>>(
 ) -> Result<()> {
     let xclbin_path = get_xclbin_path(&format!("./hls/vscale_{}", T::name()));

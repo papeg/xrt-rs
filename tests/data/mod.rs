@@ -1,3 +1,5 @@
+#[allow(dead_code)]
+
 pub const SIZE: usize = 32;
 
 pub trait VScaleTestData {

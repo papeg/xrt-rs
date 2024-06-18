@@ -1,10 +1,8 @@
-use crate::buffer::{SyncDirection, XRTBuffer};
-use crate::device::XRTDevice;
+use crate::buffer::XRTBuffer;
 use crate::ffi::*;
 use crate::kernel::XRTKernel;
 use crate::utils::is_null;
 use crate::{Error, Result};
-use std::collections::HashMap;
 
 /// Every state value that a run can have. These are ususally parsed from the u32 returned from the C-interface
 #[derive(Debug, PartialEq)]

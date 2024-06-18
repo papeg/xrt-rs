@@ -2,11 +2,14 @@ use std::collections::{HashMap, VecDeque};
 
 use crate::buffer::{SyncDirection, XRTBuffer};
 use crate::device::XRTDevice;
-use crate::ffi::*;
 use crate::kernel::XRTKernel;
 use crate::run::{ERTCommandState, XRTRun};
-use crate::utils::is_null;
 use crate::{Error, Result};
+
+pub trait ValidBufferContentType {}
+impl ValidBufferContentType for u32 {}
+impl ValidBufferContentType for u64 {}
+impl ValidBufferContentType for i32 {}
 
 
 pub enum ArgumentType {
@@ -14,7 +17,7 @@ pub enum ArgumentType {
     Buffer(XRTBuffer)
 }
 
-pub enum Argument<T> {
+pub enum ArgumentQuantity<T> {
     Single(T),
     Vec(Vec<T>),
 }
@@ -72,7 +75,7 @@ impl DeviceManager {
     /// ```
     /// 
     /// **TODO**: Make a macro to avoid having to construct an enum everytime: dm.run("vscale", my_scale, my_values);
-    pub fn run<T: Clone>(mut self, kernel_name: &str, arguments: &[Argument<T>]) -> Result<Self> {
+    pub fn run(mut self, kernel_name: &str, arguments: &[ArgumentQuantity<Box<dyn ValidBufferContentType>>]) -> Result<Self> {
         let (kernel, arg_types) = self.kernels.get(kernel_name).ok_or(Error::NoSuchKernelError)?;
         if arguments.len() != arg_types.len() {
             return Err(Error::ArgumentNumberMismatchError);
@@ -82,16 +85,16 @@ impl DeviceManager {
         for i in 0..arguments.len() {
             if let ArgumentType::Buffer(b) = &arg_types[i] {
                 let data = match &arguments[i] {
-                    Argument::Single(d) => vec![d.clone()],
-                    Argument::Vec(d) => d.clone()
+                    ArgumentQuantity::Single(d) => vec![d.clone()],
+                    ArgumentQuantity::Vec(d) => d.iter().collect()
                 };
 
                 b.write(&data, 0)?;
                 b.sync(SyncDirection::DeviceToHost, Some(data.len()), 0)?;
             } else {
                 let data = match &arguments[i] {
-                    Argument::Single(d) => d,
-                    Argument::Vec(_) => return Err(Error::PassVecToScalarArgumentError)
+                    ArgumentQuantity::Single(d) => d,
+                    ArgumentQuantity::Vec(_) => return Err(Error::PassVecToScalarArgumentError)
                 };
                 run.set_scalar_argument(i as i32, data)?;
             }
@@ -101,7 +104,7 @@ impl DeviceManager {
         Ok(self)
     }
 
-    pub fn wait_on_latest_run(mut self) -> Result<Self> {
+    pub fn wait_on_latest_run(self) -> Result<Self> {
         let result = self.open_runs.back().ok_or(Error::NoOpenRunsError)?.wait();
         match result {
             Ok(_) => Ok(self),
@@ -109,7 +112,7 @@ impl DeviceManager {
         }
     }
 
-    pub fn get_latest_run_state(mut self) -> Result<ERTCommandState> {
+    pub fn get_latest_run_state(self) -> Result<ERTCommandState> {
         self.open_runs.back().ok_or(Error::NoOpenRunsError)?.get_state()
     }
 
