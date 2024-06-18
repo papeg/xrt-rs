@@ -1,6 +1,5 @@
-/* 
 use xrt::device::XRTDevice;
-use xrt::run::ERTCommandState;
+use xrt::device_manager::{DeviceManager, HardwareDatatype};
 use xrt::utils::get_xclbin_path;
 use xrt::Result;
 
@@ -8,39 +7,30 @@ mod data;
 
 use data::{VScaleTestData, SIZE};
 
- 
-fn run_vscale_simple<T: VScaleTestData + std::fmt::Debug + Copy + std::cmp::PartialEq<T>>(
-) -> Result<()> {
+fn run_vscale_simple<
+    T: VScaleTestData + HardwareDatatype + std::fmt::Debug + Copy + std::cmp::PartialEq<T>,
+>() -> Result<()> {
     let xclbin_path = get_xclbin_path(&format!("./hls/vscale_{}", T::name()));
 
     let kernel_name = format!("vscale_{}", T::name());
 
-    let device = XRTDevice::try_from(0)?
-        .with_xclbin(&xclbin_path)?
-        .with_kernel(&kernel_name)?;
-
-    let add_kernel = device.kernel(&kernel_name)?;
-    let mut add_run = add_kernel.run()?;
-
     let input: [T; SIZE] = [T::input(); SIZE];
+    let mut output: [T; SIZE] = [T::zero(); SIZE];
 
-    // Set args
-    add_run.set_scalar_argument(0, SIZE)?;
-    add_run.set_scalar_argument(1, T::scale())?;
-    add_run.write_buffer_argument(2, &input, &device, &add_kernel)?;
-    add_run.create_read_buffer::<T>(3, SIZE, &device, &add_kernel)?;
+    DeviceManager::from(XRTDevice::try_from(0)?)
+        .with_xclbin(&xclbin_path)?
+        .with_kernel(&kernel_name)?
+        .prepare_run(&kernel_name)?
+        .set_scalar_input(0, SIZE as u32)?
+        .set_scalar_input(1, T::scale())?
+        .set_buffer_input(2, &input)?
+        .prepare_output_buffer::<T>(3, SIZE)?
+        .start_all()?
+        .wait_for_all(2000)?
+        .read_output(3, &mut output)?;
 
-    // Run
-    let _start_state = add_run.start()?;
-
-    let result_state = add_run.wait_for(1000)?;
-    assert_eq!(result_state, ERTCommandState::Completed);
-
-    // Get back data
-    let output: Vec<T> = add_run.read_buffer_argument(3, SIZE)?;
-
-    // Check result
     for elem in output {
+        println!("{:?}", elem);
         assert_eq!(elem, T::output());
     }
     Ok(())
@@ -75,4 +65,3 @@ fn run_vscale_simple_f32() -> Result<()> {
 fn run_vscale_simple_f64() -> Result<()> {
     run_vscale_simple::<f64>()
 }
-*/

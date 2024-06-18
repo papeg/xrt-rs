@@ -48,7 +48,7 @@ impl XRTBuffer {
     }
 
     /// Sync the BO in the given direction. If size is given use that value, else synchronize the buffer
-    pub fn sync(
+    pub fn sync<T>(
         &self,
         sync_direction: SyncDirection,
         size: Option<usize>,
@@ -58,7 +58,7 @@ impl XRTBuffer {
             let used_size = match size {
                 None => self.size,
                 Some(s) => s,
-            };
+            } * std::mem::size_of::<T>();
             let ret_val = unsafe { xrtBOSync(handle, sync_direction.into(), used_size, seek) };
 
             // TODO: Implement XRT error code handling: https://github.com/Xilinx/XRT/blob/master/src/runtime_src/core/include/xrt_error_code.h (Returned by some functions to specify what kind of error ocurred) if ret_val != 0 {

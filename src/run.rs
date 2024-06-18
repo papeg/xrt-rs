@@ -1,4 +1,5 @@
-use crate::buffer::XRTBuffer;
+use crate::buffer::{SyncDirection, XRTBuffer};
+use crate::device::XRTDevice;
 use crate::ffi::*;
 use crate::kernel::XRTKernel;
 use crate::utils::is_null;
@@ -62,7 +63,7 @@ impl XRTRun {
         }
     }
 
-    pub fn set_scalar_argument<T>(&mut self, index: i32, value: T) -> Result<()> {
+    pub fn set_scalar_argument<T>(&self, index: i32, value: T) -> Result<()> {
         if let Some(handle) = self.handle {
             let result = unsafe { xrtRunSetArg(handle, index, value) };
             if result != 0 {
@@ -74,7 +75,7 @@ impl XRTRun {
         }
     }
 
-    pub fn set_buffer_argument(&mut self, index: i32, buffer: &XRTBuffer) -> Result<()> {
+    pub fn set_buffer_argument(&self, index: i32, buffer: &XRTBuffer) -> Result<()> {
         if let Some(run_handle) = self.handle {
             if let Some(buffer_handle) = buffer.handle {
                 let result = unsafe { xrtRunSetArg(run_handle, index, buffer_handle) };
@@ -88,6 +89,54 @@ impl XRTRun {
         } else {
             return Err(Error::RunNotCreatedYetError);
         }
+    }
+
+    pub fn write_buffer_argument<T>(
+        &self,
+        index: i32,
+        values: &[T],
+        device: &XRTDevice,
+        kernel: &XRTKernel,
+    ) -> Result<XRTBuffer> {
+        let buffer = XRTBuffer::new(
+            &device,
+            values.len() * std::mem::size_of::<T>(),
+            XCL_BO_FLAGS_NONE,
+            kernel.get_memory_group_for_argument(index)?,
+        )?;
+
+        buffer.write(values, 0)?;
+        buffer.sync::<T>(SyncDirection::HostToDevice, None, 0)?;
+
+        Ok(buffer)
+    }
+
+    pub fn create_read_buffer<T>(
+        &self,
+        index: i32,
+        size: usize,
+        device: &XRTDevice,
+        kernel: &XRTKernel,
+    ) -> Result<XRTBuffer> {
+        let buffer = XRTBuffer::new(
+            &device,
+            size * std::mem::size_of::<T>(),
+            XCL_BO_FLAGS_NONE,
+            kernel.get_memory_group_for_argument(index)?,
+        )?;
+
+        Ok(buffer)
+    }
+
+    pub fn read_buffer_argument<T>(
+        &mut self,
+        buffer: &XRTBuffer,
+        size: usize,
+        output: &mut [T],
+    ) -> Result<()> {
+        buffer.sync::<T>(SyncDirection::DeviceToHost, Some(size), 0)?;
+        buffer.read(output, 0)?;
+        Ok(())
     }
 
     /// Get the current ERTCommandState of the run. Returns an error if called before this run is properly initialized

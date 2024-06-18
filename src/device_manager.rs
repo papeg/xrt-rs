@@ -1,124 +1,195 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 
-use crate::buffer::{SyncDirection, XRTBuffer};
+use crate::buffer::XRTBuffer;
 use crate::device::XRTDevice;
 use crate::kernel::XRTKernel;
-use crate::run::{ERTCommandState, XRTRun};
+use crate::run::XRTRun;
 use crate::{Error, Result};
 
-pub trait ValidBufferContentType {}
-impl ValidBufferContentType for u32 {}
-impl ValidBufferContentType for u64 {}
-impl ValidBufferContentType for i32 {}
+pub trait HardwareDatatype {}
 
+impl HardwareDatatype for u32 {}
+impl HardwareDatatype for i32 {}
+impl HardwareDatatype for u64 {}
+impl HardwareDatatype for i64 {}
+impl HardwareDatatype for f32 {}
+impl HardwareDatatype for f64 {}
 
-pub enum ArgumentType {
-    Scalar,
-    Buffer(XRTBuffer)
+pub enum ArgumentType<'a, T: HardwareDatatype> {
+    Scalar(T),
+    Buffer(&'a [T]),
 }
 
-pub enum ArgumentQuantity<T> {
-    Single(T),
-    Vec(Vec<T>),
+// contains a run and its corresponding buffers
+pub struct ActiveRun {
+    run: XRTRun,
+    buffers: HashMap<i32, XRTBuffer>,
 }
 
-/// Idea: Make life easier for the user. The usage is kind of imagined like this:
-/// ```
-/// let values = vec![1,2,3,4];
-/// let dm = DeviceManager::new()
-///     .with_xclbin("scaler.xclbin")?
-///     .with_kernel("vscale")?
-///     .run("vscale", arguments!(4, values))?
-///     .wait_on_latest_run()?;
-/// let result_state = dm.get_latest_run_state()?;
-/// dm.remove_latest_run()?
-///     .run(...); 
-/// ```
-/// 
-/// Some features for that are still missing, for example automatically retrieving what types the arguments of a kernel are
+impl From<XRTRun> for ActiveRun {
+    fn from(run: XRTRun) -> ActiveRun {
+        ActiveRun {
+            run,
+            buffers: HashMap::new(),
+        }
+    }
+}
+
 pub struct DeviceManager {
     device: XRTDevice,
-    kernels: HashMap<String, (XRTKernel, Vec<ArgumentType>)>,
-    
-    /// A vec of open runs. Gets added to when a run is started
-    open_runs: VecDeque<XRTRun>,
+    kernels: HashMap<String, XRTKernel>,
+    runs: HashMap<String, Vec<ActiveRun>>,
+    current_kernel: Option<String>,
+    current_run: Option<usize>,
+}
+
+impl From<XRTDevice> for DeviceManager {
+    fn from(device: XRTDevice) -> DeviceManager {
+        DeviceManager {
+            device: device,
+            kernels: HashMap::new(),
+            runs: HashMap::new(),
+            current_kernel: None,
+            current_run: None,
+        }
+    }
 }
 
 impl DeviceManager {
-    pub fn new() -> Self {
-        DeviceManager { 
-            device: XRTDevice::new(), 
-            kernels: HashMap::new(), 
-            open_runs: VecDeque::new()
-        }
-    }
-
     pub fn with_xclbin(mut self, xclbin_path: &str) -> Result<Self> {
         self.device.load_xclbin(xclbin_path)?;
         Ok(self)
     }
 
-    // TODO: Urgent: Extract info about arguments for kernels from xclbin!
-    pub fn with_kernel(mut self, kernel_name: &str, arglist: Vec<ArgumentType>) -> Result<Self> {
-        let kernel = XRTKernel::new(kernel_name, &self.device)?;        
-        self.kernels.insert(kernel_name.to_string(), (kernel, arglist));
+    pub fn with_kernel(mut self, kernel_name: &str) -> Result<Self> {
+        let kernel = XRTKernel::new(kernel_name, &self.device)?;
+        self.kernels.insert(kernel_name.to_string(), kernel);
         Ok(self)
     }
 
-    /// The idea here is that you can pass in the arguments, and the function takes care of whether it has to be written into a buffer first
-    /// or can be passed directly. This enables you to pass in data easily:
-    /// ```
-    /// let my_values = vec![1,2,3,4];
-    /// let my_scale = 4;
-    /// 
-    /// dm.run("vscale", &[Argument::Single(my_scale), Argument::Vec(my_values)]);
-    /// ```
-    /// 
-    /// **TODO**: Make a macro to avoid having to construct an enum everytime: dm.run("vscale", my_scale, my_values);
-    pub fn run(mut self, kernel_name: &str, arguments: &[ArgumentQuantity<Box<dyn ValidBufferContentType>>]) -> Result<Self> {
-        let (kernel, arg_types) = self.kernels.get(kernel_name).ok_or(Error::NoSuchKernelError)?;
-        if arguments.len() != arg_types.len() {
-            return Err(Error::ArgumentNumberMismatchError);
-        }
-        let mut run = XRTRun::new(kernel)?;
-
-        for i in 0..arguments.len() {
-            if let ArgumentType::Buffer(b) = &arg_types[i] {
-                let data = match &arguments[i] {
-                    ArgumentQuantity::Single(d) => vec![d.clone()],
-                    ArgumentQuantity::Vec(d) => d.iter().collect()
-                };
-
-                b.write(&data, 0)?;
-                b.sync(SyncDirection::DeviceToHost, Some(data.len()), 0)?;
+    pub fn prepare_run(mut self, kernel_name: &str) -> Result<Self> {
+        if let Some(kernel) = self.kernels.get(kernel_name) {
+            self.current_kernel = Some(kernel_name.into());
+            if let Some(runs) = self.runs.get_mut(kernel_name) {
+                runs.push(ActiveRun::from(kernel.run()?));
+                self.current_run = Some(runs.len() - 1);
             } else {
-                let data = match &arguments[i] {
-                    ArgumentQuantity::Single(d) => d,
-                    ArgumentQuantity::Vec(_) => return Err(Error::PassVecToScalarArgumentError)
-                };
-                run.set_scalar_argument(i as i32, data)?;
+                let mut runs: Vec<ActiveRun> = Vec::new();
+                runs.push(ActiveRun::from(kernel.run()?));
+                self.runs.insert(kernel_name.into(), runs);
+                self.current_run = Some(0);
+            }
+            Ok(self)
+        } else {
+            return Err(Error::KernelNotLoadedYetError);
+        }
+    }
+
+    pub fn set_input<T: HardwareDatatype>(
+        mut self,
+        index: i32,
+        value: ArgumentType<T>,
+    ) -> Result<Self> {
+        if let Some(kernel_name) = &self.current_kernel {
+            if let Some(kernel) = self.kernels.get(kernel_name.into()) {
+                if let Some(current_run) = self.current_run {
+                    if let Some(runs) = self.runs.get_mut(kernel_name.into()) {
+                        let run = &mut runs[current_run];
+                        match value {
+                            ArgumentType::Scalar(value) => {
+                                run.run.set_scalar_argument(index, value)?;
+                            }
+                            ArgumentType::Buffer(values) => {
+                                run.buffers.insert(
+                                    index,
+                                    run.run.write_buffer_argument(
+                                        index,
+                                        values,
+                                        &self.device,
+                                        kernel,
+                                    )?,
+                                );
+                            }
+                        }
+                        return Ok(self);
+                    }
+                }
+                return Err(Error::RunNotCreatedYetError);
             }
         }
-        
-        self.open_runs.push_back(run);
-        Ok(self)
+        Err(Error::KernelNotLoadedYetError)
     }
 
-    pub fn wait_on_latest_run(self) -> Result<Self> {
-        let result = self.open_runs.back().ok_or(Error::NoOpenRunsError)?.wait();
-        match result {
-            Ok(_) => Ok(self),
-            Err(e) => Err(e)
+    pub fn set_scalar_input<T: HardwareDatatype>(self, index: i32, value: T) -> Result<Self> {
+        self.set_input(index, ArgumentType::Scalar(value))
+    }
+
+    pub fn set_buffer_input<T: HardwareDatatype>(self, index: i32, values: &[T]) -> Result<Self> {
+        self.set_input(index, ArgumentType::Buffer(values))
+    }
+
+    pub fn prepare_output_buffer<T: HardwareDatatype>(
+        mut self,
+        index: i32,
+        size: usize,
+    ) -> Result<Self> {
+        if let Some(kernel_name) = &self.current_kernel {
+            if let Some(kernel) = self.kernels.get(kernel_name.into()) {
+                if let Some(current_run) = self.current_run {
+                    if let Some(runs) = self.runs.get_mut(kernel_name.into()) {
+                        let run = &mut runs[current_run];
+                        run.buffers.insert(
+                            index,
+                            run.run
+                                .create_read_buffer::<T>(index, size, &self.device, kernel)?,
+                        );
+
+                        return Ok(self);
+                    }
+                }
+                return Err(Error::RunNotCreatedYetError);
+            }
         }
+        Err(Error::KernelNotLoadedYetError)
     }
 
-    pub fn get_latest_run_state(self) -> Result<ERTCommandState> {
-        self.open_runs.back().ok_or(Error::NoOpenRunsError)?.get_state()
-    }
-
-    pub fn remove_latest_run(mut self) -> Result<Self> {
-        self.open_runs.pop_front();
+    pub fn start_all(self) -> Result<Self> {
+        for runs in self.runs.values() {
+            for run in runs {
+                run.run.start()?;
+            }
+        }
         Ok(self)
     }
 
+    pub fn wait_for_all(self, timeout_ms: u32) -> Result<Self> {
+        for runs in self.runs.values() {
+            for run in runs {
+                run.run.wait_for(timeout_ms)?;
+            }
+        }
+        Ok(self)
+    }
+
+    pub fn read_output<T: HardwareDatatype>(
+        mut self,
+        index: i32,
+        values: &mut [T],
+    ) -> Result<Self> {
+        if let Some(kernel_name) = &self.current_kernel {
+            if let Some(current_run) = self.current_run {
+                if let Some(runs) = self.runs.get_mut(kernel_name.into()) {
+                    let run = &mut runs[current_run];
+                    if let Some(buffer) = run.buffers.get(&index) {
+                        run.run.read_buffer_argument(buffer, values.len(), values)?;
+                        return Ok(self);
+                    } else {
+                        return Err(Error::BONotCreatedYet);
+                    }
+                }
+            }
+            return Err(Error::RunNotCreatedYetError);
+        }
+        Err(Error::KernelNotLoadedYetError)
+    }
 }

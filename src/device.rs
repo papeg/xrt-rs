@@ -2,7 +2,6 @@ use crate::ffi::*;
 use crate::utils::is_null;
 use crate::{Error, Result};
 
-
 pub struct XRTDevice {
     pub(crate) handle: Option<xrtDeviceHandle>,
     pub(crate) xclbin_handle: Option<xrtXclbinHandle>,
@@ -27,7 +26,11 @@ impl TryFrom<u32> for XRTDevice {
 impl XRTDevice {
     // TODO: constructor from PCIe bdf
     pub fn new() -> Self {
-        XRTDevice { handle: None, xclbin_handle: None, xclbin_uuid: None }
+        XRTDevice {
+            handle: None,
+            xclbin_handle: None,
+            xclbin_uuid: None,
+        }
     }
 
     pub fn load_xclbin(&mut self, path: &str) -> Result<()> {
@@ -61,7 +64,6 @@ impl XRTDevice {
         self.load_xclbin(path)?;
         Ok(self)
     }
-
 
     pub fn is_ready(&self) -> bool {
         self.handle.is_some() && self.xclbin_handle.is_some() && self.xclbin_uuid.is_some()
