@@ -1,25 +1,12 @@
 use std::collections::HashMap;
 
-use crate::buffer::XRTBuffer;
-use crate::device::XRTDevice;
-use crate::kernel::XRTKernel;
-use crate::run::XRTRun;
+use crate::managed::device::ManagedDevice;
+use crate::native::buffer::XRTBuffer;
+use crate::native::device::XRTDevice;
+use crate::native::kernel::XRTKernel;
+use crate::native::run::XRTRun;
+use crate::HardwareDatatype;
 use crate::{Error, Result};
-
-pub trait HardwareDatatype {}
-
-impl HardwareDatatype for u32 {}
-impl HardwareDatatype for i32 {}
-impl HardwareDatatype for u64 {}
-impl HardwareDatatype for i64 {}
-impl HardwareDatatype for f32 {}
-impl HardwareDatatype for f64 {}
-
-pub enum ArgumentType<'a, T: HardwareDatatype> {
-    Scalar(T),
-    Buffer(&'a [T]),
-}
-
 // contains a run and its corresponding buffers
 pub struct ManagedRun<'a> {
     run: XRTRun,
@@ -91,41 +78,6 @@ impl ManagedRun<'_> {
             return Ok(self);
         } else {
             return Err(Error::BONotCreatedYet);
-        }
-    }
-}
-
-pub struct ManagedDevice {
-    device: XRTDevice,
-    kernels: HashMap<String, XRTKernel>,
-}
-
-impl From<XRTDevice> for ManagedDevice {
-    fn from(device: XRTDevice) -> ManagedDevice {
-        ManagedDevice {
-            device,
-            kernels: HashMap::new(),
-        }
-    }
-}
-
-impl ManagedDevice {
-    pub fn with_xclbin(mut self, xclbin_path: &str) -> Result<Self> {
-        self.device.load_xclbin(xclbin_path)?;
-        Ok(self)
-    }
-
-    pub fn with_kernel(mut self, kernel_name: &str) -> Result<Self> {
-        let kernel = XRTKernel::new(kernel_name, &self.device)?;
-        self.kernels.insert(kernel_name.to_string(), kernel);
-        Ok(self)
-    }
-
-    pub fn run(&self, kernel_name: &str) -> Result<ManagedRun> {
-        if let Some(kernel) = self.kernels.get(kernel_name) {
-            ManagedRun::new(&self, kernel)
-        } else {
-            return Err(Error::KernelNotLoadedYetError);
         }
     }
 }

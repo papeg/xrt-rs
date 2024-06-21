@@ -1,7 +1,7 @@
-use crate::buffer::{SyncDirection, XRTBuffer};
-use crate::device::XRTDevice;
 use crate::ffi::*;
-use crate::kernel::XRTKernel;
+use crate::native::buffer::{SyncDirection, XRTBuffer};
+use crate::native::device::XRTDevice;
+use crate::native::kernel::XRTKernel;
 use crate::utils::is_null;
 use crate::{Error, Result};
 

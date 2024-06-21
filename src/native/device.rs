@@ -1,5 +1,5 @@
-use crate::device_manager::ManagedDevice;
 use crate::ffi::*;
+use crate::managed::device::ManagedDevice;
 use crate::utils::is_null;
 use crate::{Error, Result};
 

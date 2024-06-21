@@ -1,6 +1,6 @@
-use xrt::device::XRTDevice;
-use xrt::device_manager::HardwareDatatype;
+use xrt::native::device::XRTDevice;
 use xrt::utils::get_xclbin_path;
+use xrt::HardwareDatatype;
 use xrt::Result;
 
 mod data;

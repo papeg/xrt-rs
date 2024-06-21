@@ -1,6 +1,6 @@
-use crate::device::*;
 use crate::ffi::*;
-use crate::run::XRTRun;
+use crate::native::device::XRTDevice;
+use crate::native::run::XRTRun;
 use crate::utils::is_null;
 use crate::{Error, Result};
 

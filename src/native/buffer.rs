@@ -1,5 +1,5 @@
-use crate::device::XRTDevice;
 use crate::ffi::*;
+use crate::native::device::XRTDevice;
 use crate::utils::is_null;
 use crate::{Error, Result};
 use std::ffi::c_void;

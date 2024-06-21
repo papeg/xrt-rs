@@ -21,13 +21,20 @@
 #![allow(non_snake_case)]
 #![allow(improper_ctypes)]
 
-pub mod buffer;
-pub mod device;
-pub mod device_manager;
 pub mod error;
 pub mod ffi;
-pub mod kernel;
-pub mod run;
+pub mod managed;
+pub mod native;
 pub mod utils;
 
 pub use error::{Error, Result};
+
+// marker for which datatypes are supported by HLS
+pub trait HardwareDatatype {}
+
+impl HardwareDatatype for u32 {}
+impl HardwareDatatype for i32 {}
+impl HardwareDatatype for u64 {}
+impl HardwareDatatype for i64 {}
+impl HardwareDatatype for f32 {}
+impl HardwareDatatype for f64 {}

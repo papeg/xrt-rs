@@ -1,10 +1,10 @@
-use xrt::buffer::SyncDirection;
-use xrt::buffer::XRTBuffer;
-use xrt::device::XRTDevice;
 use xrt::ffi::XCL_BO_FLAGS_NONE;
-use xrt::kernel::XRTKernel;
-use xrt::run::ERTCommandState;
-use xrt::run::XRTRun;
+use xrt::native::buffer::SyncDirection;
+use xrt::native::buffer::XRTBuffer;
+use xrt::native::device::XRTDevice;
+use xrt::native::kernel::XRTKernel;
+use xrt::native::run::ERTCommandState;
+use xrt::native::run::XRTRun;
 use xrt::utils::get_xclbin_path;
 use xrt::Result;
 
