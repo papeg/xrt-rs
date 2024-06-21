@@ -1,3 +1,4 @@
+use crate::device_manager::ManagedDevice;
 use crate::ffi::*;
 use crate::utils::is_null;
 use crate::{Error, Result};
@@ -31,6 +32,10 @@ impl XRTDevice {
             xclbin_handle: None,
             xclbin_uuid: None,
         }
+    }
+
+    pub fn manage(self) -> ManagedDevice {
+        ManagedDevice::from(self)
     }
 
     pub fn load_xclbin(&mut self, path: &str) -> Result<()> {

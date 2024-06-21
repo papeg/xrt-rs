@@ -37,7 +37,7 @@ impl XRTKernel {
     }
 
     pub fn run(&self) -> Result<XRTRun> {
-        XRTRun::new(&self)
+        XRTRun::try_from(self)
     }
 
     /// Get the memory group for the buffer that is used as an argument to this kernel. This is needed when creating the buffer object

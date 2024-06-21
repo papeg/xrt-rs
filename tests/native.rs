@@ -19,7 +19,7 @@ fn run_vscale_native<T: VScaleTestData + std::fmt::Debug + Copy + std::cmp::Part
     let mut device = XRTDevice::try_from(0)?;
     device.load_xclbin(get_xclbin_path(&format!("./hls/vscale_{}", T::name())).as_str())?;
     let add_kernel = XRTKernel::new(&format!("vscale_{}", T::name()), &device)?;
-    let add_run = XRTRun::new(&add_kernel)?;
+    let add_run = XRTRun::try_from(&add_kernel)?;
     let in_buffer = XRTBuffer::new(
         &device,
         SIZE * std::mem::size_of::<T>(),

@@ -1,5 +1,5 @@
 use xrt::device::XRTDevice;
-use xrt::device_manager::{DeviceManager, HardwareDatatype};
+use xrt::device_manager::HardwareDatatype;
 use xrt::utils::get_xclbin_path;
 use xrt::Result;
 
@@ -17,20 +17,22 @@ fn run_vscale_simple<
     let input: [T; SIZE] = [T::input(); SIZE];
     let mut output: [T; SIZE] = [T::zero(); SIZE];
 
-    DeviceManager::from(XRTDevice::try_from(0)?)
+    let device = XRTDevice::try_from(0)?
+        .manage()
         .with_xclbin(&xclbin_path)?
-        .with_kernel(&kernel_name)?
-        .prepare_run(&kernel_name)?
+        .with_kernel(&kernel_name)?;
+
+    device
+        .run(&kernel_name)?
         .set_scalar_input(0, SIZE as u32)?
         .set_scalar_input(1, T::scale())?
         .set_buffer_input(2, &input)?
         .prepare_output_buffer::<T>(3, SIZE)?
-        .start_all()?
-        .wait_for_all(2000)?
+        .start()?
+        .wait_for(2000)?
         .read_output(3, &mut output)?;
 
     for elem in output {
-        println!("{:?}", elem);
         assert_eq!(elem, T::output());
     }
     Ok(())

@@ -48,8 +48,9 @@ pub struct XRTRun {
     pub(crate) handle: Option<xrtRunHandle>,
 }
 
-impl XRTRun {
-    pub fn new(kernel: &XRTKernel) -> Result<Self> {
+impl TryFrom<&XRTKernel> for XRTRun {
+    type Error = Error;
+    fn try_from(kernel: &XRTKernel) -> Result<XRTRun> {
         if let Some(kernel_handle) = kernel.handle {
             let run_handle = unsafe { xrtRunOpen(kernel_handle) };
             if is_null(run_handle) {
@@ -62,7 +63,9 @@ impl XRTRun {
             return Err(Error::KernelNotLoadedYetError);
         }
     }
+}
 
+impl XRTRun {
     pub fn set_scalar_argument<T>(&self, index: i32, value: T) -> Result<()> {
         if let Some(handle) = self.handle {
             let result = unsafe { xrtRunSetArg(handle, index, value) };
