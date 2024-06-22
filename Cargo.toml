@@ -1,6 +1,6 @@
 [package]
 name = "xrt"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "Wrapper for the Xilinx Runtime Library (XRT)"
 license = "AGPL-3.0-or-later"
