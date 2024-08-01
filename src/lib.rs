@@ -26,6 +26,7 @@ pub mod ffi;
 pub mod managed;
 pub mod native;
 pub mod utils;
+pub mod xclbin_reader;
 
 pub use error::{Error, Result};
 

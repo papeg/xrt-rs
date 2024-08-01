@@ -10,3 +10,4 @@ _x_vscale*
 *.ltx
 *.link_summary
 _x_add*
+src/ffi/bindings_c.rs

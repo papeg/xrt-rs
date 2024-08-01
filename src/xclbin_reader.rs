@@ -1,12 +1,7 @@
 //! Module to read out relevant data from an xclbin file
 //! Can directly convert the information into actual XRT buffers
-use std::collections::HashMap;
-
-use crate::buffer::XRTBuffer;
 use crate::Result;
-use crate::Error;
-use serde_json::Value;
-use crate::common::*;
+use crate::error::Error;
 
 /// _Usage_: parse_data!(slice, target_type, range);
 /// 
@@ -40,14 +35,14 @@ pub fn read_xclbin(path: &str) -> Result<Vec<u8>> {
 }
 
 /// A section header of an xclbin file. Leaves out the name since it's irrelevant here
-struct SectionHeader {
+pub struct SectionHeader {
     pub kind: u32,
     pub offset: u64,
     pub size: u64,
 }
 
 /// Read all section headers from the bytevector
-fn get_section_data(data: &Vec<u8>) -> Result<Vec<SectionHeader>> {
+pub fn get_section_data(data: &Vec<u8>) -> Result<Vec<SectionHeader>> {
     let num_sections: u32 = parse_data!(data, std::primitive::u32, 448..452);
     let mut headers: Vec<SectionHeader> = Vec::new();
     for section_index in 0..num_sections {
@@ -65,7 +60,7 @@ fn get_section_data(data: &Vec<u8>) -> Result<Vec<SectionHeader>> {
 
 
 /// Find out if a build metadata section exists, and if so, extract the JSON it contains
-fn get_build_metadata(data: &Vec<u8>, headers: &Vec<SectionHeader>) -> Result<serde_json::Value> {
+pub fn get_build_metadata(data: &Vec<u8>, headers: &Vec<SectionHeader>) -> Result<serde_json::Value> {
     let matching = headers.iter().filter(|h| h.kind == 14).collect::<Vec<_>>();
     if matching.len() == 0 {
         return Err(Error::XclbinNoBuildMetadataSection);
@@ -78,9 +73,11 @@ fn get_build_metadata(data: &Vec<u8>, headers: &Vec<SectionHeader>) -> Result<se
 }
 
 
-/// Read the XCLBIN file and create buffers and scalar arguments accordingly. This produces an argumentMapping that
-/// a kernel can use to check whether its supplied arguments are correct. It also avoids having to ask the user what arguments
-/// are needed and of what type
+// Read the XCLBIN file and create buffers and scalar arguments accordingly. This produces an argumentMapping that
+// a kernel can use to check whether its supplied arguments are correct. It also avoids having to ask the user what arguments
+// are needed and of what type
+/*
 pub fn conjure_kernel_arguments(kernel_name: &str) -> Result<ArgumentMapping> {
 
 }
+*/

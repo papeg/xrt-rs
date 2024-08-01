@@ -24,6 +24,11 @@ pub enum Error {
     ArgumentNumberMismatchError,
     PassVecToScalarArgumentError,
     NoOpenRunsError,
+
+    // XCLBIN READER ERRORS
+    XclbinInvalidMagicString(String),
+    XclbinByteReadingError(usize, usize),
+    XclbinNoBuildMetadataSection,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
