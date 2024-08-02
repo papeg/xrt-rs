@@ -1,3 +1,4 @@
+//! Util functions for development of xrt-rs
 pub fn get_xclbin_path(name: &str) -> String {
     let mode = match std::env::var("XCL_EMULATION_MODE") {
         Ok(val) => val,

@@ -10,17 +10,17 @@ use crate::error::Error;
 
 /// This struct is what is needed to retrieve the kernel arguments from the xclbin. It is parsed to by serde json
 #[derive(Debug, Deserialize)]
-pub struct BuildMetadata {
+struct BuildMetadata {
     build_metadata: BuildMetadataContent,
     schema_version: HashMap<String, String>
 }
 #[derive(Debug, Deserialize)]
-pub struct BuildMetadataContent {
+struct BuildMetadataContent {
     dsa: DSA,
     xclbin: XCLBIN
 }
 #[derive(Debug, Deserialize)]
-pub struct DSA {
+struct DSA {
     board: HashMap<String, String>,
     board_id: String,
     description: String,
@@ -32,13 +32,13 @@ pub struct DSA {
     version_minor: String,
 }
 #[derive(Debug, Deserialize)]
-pub struct XCLBIN {
+struct XCLBIN {
     generated_by: HashMap<String, String>,
     packaged_by: HashMap<String, String>,
     user_regions: Vec<UserRegion>
 }
 #[derive(Debug, Deserialize)]
-pub struct UserRegion {
+struct UserRegion {
     base_address: String,
     instance_path: String,
     kernels: Vec<XclbinKernel>,
@@ -47,7 +47,7 @@ pub struct UserRegion {
     typ: String
 }
 #[derive(Debug, Deserialize, Clone)]
-pub struct XclbinKernel {
+struct XclbinKernel {
     arguments: Vec<HashMap<String, String>>,
     name: String,
     instances: Vec<HashMap<String, String>>,
@@ -103,14 +103,14 @@ pub fn read_xclbin(path: &str) -> Result<Vec<u8>> {
 }
 
 /// A section header of an xclbin file. Leaves out the name since it's irrelevant here
-pub struct SectionHeader {
+struct SectionHeader {
     pub kind: u32,
     pub offset: u64,
     pub size: u64,
 }
 
 /// Read all section headers from the bytevector
-pub fn get_section_data(data: &Vec<u8>) -> Result<Vec<SectionHeader>> {
+fn get_section_data(data: &Vec<u8>) -> Result<Vec<SectionHeader>> {
     let num_sections: u32 = parse_data!(data, std::primitive::u32, 448..452);
     let mut headers: Vec<SectionHeader> = Vec::new();
     for section_index in 0..num_sections {
@@ -128,24 +128,30 @@ pub fn get_section_data(data: &Vec<u8>) -> Result<Vec<SectionHeader>> {
 
 
 /// Find out if a build metadata section exists, and if so, extract the JSON it contains
-pub fn get_build_metadata(data: &Vec<u8>, headers: &Vec<SectionHeader>) -> Vec<Result<serde_json::Value>> {
+fn get_build_metadata(data: &Vec<u8>, headers: &Vec<SectionHeader>) -> Result<serde_json::Value> {
     let matching = headers.iter().filter(|h| (h.kind == 14)).collect::<Vec<_>>();
     if matching.len() == 0 {
-        return Vec::new(); // TODO: Change back to returning a single value instead of a vec
+        return Err(Error::XclbinNoBuildMetadataSection);
     }
-
-    matching.iter().map(|m| {
-        let offset = m.offset as usize;
-        let size = m.size as usize;
-        serde_json::from_slice::<serde_json::Value>(&data[offset..offset+size]).map_err(|e| Error::XclbinInvalidMagicString(e.to_string()))
-    }).collect()
+    let offset = matching[0].offset as usize;
+    let size = matching[0].size as usize;
+    serde_json::from_slice::<serde_json::Value>(&data[offset..offset+size]).map_err(|e| Error::XclbinInvalidMagicString(e.to_string()))
 }
 
 /// Given the build metadata as a serde_json value, look for a specific kernel and return its "arguments" json value 
-pub fn extract_arguments(metadata: &serde_json::Value, kernel_name: &str) -> Result<Vec<HashMap<String, String>>> {
+fn extract_arguments(metadata: &serde_json::Value, kernel_name: &str) -> Result<Vec<HashMap<String, String>>> {
     let bm: BuildMetadata = serde_json::from_str(&metadata.to_string()).unwrap(); // TODO: In future avoid this and directly parse
     let kernel = bm.get_kernel(kernel_name).ok_or(Error::XclbinNoKernelOfSuchName(kernel_name.to_owned()))?;
     Ok(kernel.arguments.clone())
+}
+
+
+/// Public function to extract argument data from a given xclbin file. Returns the info as HashMaps per argument, ordered by the arguments ID 
+pub fn get_arguments(path: &str, kernel_name: &str) -> Result<Vec<HashMap<String, String>>> {
+    let raw = read_xclbin(path)?;
+    let sections = get_section_data(&raw)?;
+    let bm = get_build_metadata(&raw, &sections)?;
+    return extract_arguments(&bm, kernel_name);
 }
 
 /*

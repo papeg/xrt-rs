@@ -1,15 +1,14 @@
 use xrt::xclbin_reader::*;
 
+extern crate xrt_proc_macro;
+use xrt_proc_macro::*;
+
+#[kernel(add_kernel, abc)]
+struct MyStruct;
+
 fn main() {
-    let raw = read_xclbin("vscale_f32_sw_emu.xclbin").unwrap();
-    let section_headers = get_section_data(&raw).unwrap();
-    let values = get_build_metadata(&raw, &section_headers);
-    for value in values {
-        if let Ok(v) = value {
-            let args = extract_arguments(&v, "vscale_f32").unwrap();
-            for arg in args {
-                println!("{}  |  {}  |  {}", arg["name"], arg["type"], arg["size"]);
-            }
-        }
+    let values = get_arguments("hls/vscale_f32_sw_emu.xclbin", "vscale_f32").unwrap();
+    for arg in values {
+        println!("{}  |  {}  |  {}", arg["name"], arg["type"], arg["size"]);
     }
 }

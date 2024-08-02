@@ -1,3 +1,4 @@
+//! Module with all errors that are needed to use xrt-rs
 #[derive(Debug)]
 pub enum Error {
     CStringCreationError,
