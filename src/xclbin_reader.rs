@@ -1,10 +1,12 @@
 //! Module to read out relevant data from an xclbin file
 //! Can directly convert the information into actual XRT buffers
+#![allow(dead_code)]
+
 use std::collections::HashMap;
 use serde::Deserialize;
 use crate::Result;
 use crate::error::Error;
-use crate::managed::arguments::ArgumentType;
+//use crate::managed::arguments::ArgumentType;
 
 /// This struct is what is needed to retrieve the kernel arguments from the xclbin. It is parsed to by serde json
 #[derive(Debug, Deserialize)]
@@ -44,7 +46,7 @@ pub struct UserRegion {
     #[serde(rename = "type")] 
     typ: String
 }
-#[derive(Debug, Deserialize, Clone, Copy)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct XclbinKernel {
     arguments: Vec<HashMap<String, String>>,
     name: String,
@@ -57,8 +59,8 @@ impl BuildMetadata {
         if self.build_metadata.xclbin.user_regions.len() < 1 {
             return None;
         }
-        for user_region in self.build_metadata.xclbin.user_regions {
-            for kernel in user_region.kernels {
+        for user_region in &self.build_metadata.xclbin.user_regions {
+            for kernel in &user_region.kernels {
                 if kernel.name == kernel_name {
                     return Some(kernel.clone());
                 }
@@ -140,10 +142,26 @@ pub fn get_build_metadata(data: &Vec<u8>, headers: &Vec<SectionHeader>) -> Vec<R
 }
 
 /// Given the build metadata as a serde_json value, look for a specific kernel and return its "arguments" json value 
-pub fn extract_arguments(metadata: &serde_json::Value, kernel_name: &str) -> Result<XclbinKernel> {
+pub fn extract_arguments(metadata: &serde_json::Value, kernel_name: &str) -> Result<Vec<HashMap<String, String>>> {
     let bm: BuildMetadata = serde_json::from_str(&metadata.to_string()).unwrap(); // TODO: In future avoid this and directly parse
-    bm.get_kernel(kernel_name).ok_or(Error::XclbinNoKernelOfSuchName(kernel_name.to_owned()))
+    let kernel = bm.get_kernel(kernel_name).ok_or(Error::XclbinNoKernelOfSuchName(kernel_name.to_owned()))?;
+    Ok(kernel.arguments.clone())
 }
+
+/*
+TODO: Write proc macro to create the appropiate code from this 
+Something like:
+
+#[kernel("a.xclbin")]
+struct MyKernel;
+
+to create the function that has the correct parameters for setting the kernel arguments:
+impl MyKernel {
+    fn set(a: u32, b: XRTBuffer<ui64>) {
+    ...
+    }
+}
+
 
 pub fn get_argument_types(kernel: &XclbinKernel) -> Vec<ArgumentType> {
     let mut v: Vec<ArgumentType> = Vec::new();
@@ -156,3 +174,4 @@ pub fn get_argument_types(kernel: &XclbinKernel) -> Vec<ArgumentType> {
         v.push()
     }
 }
+    */
