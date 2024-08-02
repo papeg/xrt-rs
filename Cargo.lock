@@ -407,5 +407,6 @@ name = "xrt"
 version = "0.3.0"
 dependencies = [
  "bindgen",
+ "serde",
  "serde_json",
 ]

@@ -14,3 +14,4 @@ bindgen = "0.69.4"
 
 [dependencies]
 serde_json = "1.0.121"
+serde = { version = "1.0", features = ["derive"] }

@@ -1,7 +1,74 @@
 //! Module to read out relevant data from an xclbin file
 //! Can directly convert the information into actual XRT buffers
+use std::collections::HashMap;
+
+use serde::Deserialize;
+
 use crate::Result;
 use crate::error::Error;
+
+/// This struct is what is needed to retrieve the kernel arguments from the xclbin. It is parsed to by serde json
+#[derive(Debug, Deserialize)]
+pub struct BuildMetadata {
+    build_metadata: BuildMetadataContent,
+    schema_version: HashMap<String, String>
+}
+#[derive(Debug, Deserialize)]
+pub struct BuildMetadataContent {
+    dsa: DSA,
+    xclbin: XCLBIN
+}
+#[derive(Debug, Deserialize)]
+pub struct DSA {
+    board: HashMap<String, String>,
+    board_id: String,
+    description: String,
+    feature_roms: Vec<HashMap<String, String>>,
+    generated_by: HashMap<String, String>,
+    name: String,
+    vendor: String,
+    version_major: String,
+    version_minor: String,
+}
+#[derive(Debug, Deserialize)]
+pub struct XCLBIN {
+    generated_by: HashMap<String, String>,
+    packaged_by: HashMap<String, String>,
+    user_regions: Vec<UserRegion>
+}
+#[derive(Debug, Deserialize)]
+pub struct UserRegion {
+    base_address: String,
+    instance_path: String,
+    kernels: Vec<XclbinKernel>,
+    name: String,
+    #[serde(rename = "type")] 
+    typ: String
+}
+#[derive(Debug, Deserialize, Clone, Copy)]
+pub struct XclbinKernel {
+    arguments: Vec<HashMap<String, String>>,
+    name: String,
+    instances: Vec<HashMap<String, String>>,
+    ports: Vec<HashMap<String, String>>
+}
+
+impl BuildMetadata {
+    fn get_kernel(&self, kernel_name: &str) -> Option<XclbinKernel> {
+        if self.build_metadata.xclbin.user_regions.len() < 1 {
+            return None;
+        }
+        for user_region in self.build_metadata.xclbin.user_regions {
+            for kernel in user_region.kernels {
+                if kernel.name == kernel_name {
+                    return Some(kernel.clone());
+                }
+            }
+        }
+        None
+    }
+}
+
 
 /// _Usage_: parse_data!(slice, target_type, range);
 /// 
@@ -60,16 +127,22 @@ pub fn get_section_data(data: &Vec<u8>) -> Result<Vec<SectionHeader>> {
 
 
 /// Find out if a build metadata section exists, and if so, extract the JSON it contains
-pub fn get_build_metadata(data: &Vec<u8>, headers: &Vec<SectionHeader>) -> Result<serde_json::Value> {
-    let matching = headers.iter().filter(|h| h.kind == 14).collect::<Vec<_>>();
+pub fn get_build_metadata(data: &Vec<u8>, headers: &Vec<SectionHeader>) -> Vec<Result<serde_json::Value>> {
+    let matching = headers.iter().filter(|h| (h.kind == 14)).collect::<Vec<_>>();
     if matching.len() == 0 {
-        return Err(Error::XclbinNoBuildMetadataSection);
+        return Vec::new(); // TODO: Change back to returning a single value instead of a vec
     }
 
-    // Better be explicit than have everything be a oneliner
-    let offset = matching[0].offset as usize;
-    let size = matching[0].size as usize;
-    serde_json::from_slice::<serde_json::Value>(&data[offset..offset+size]).map_err(|e| Error::XclbinInvalidMagicString(e.to_string()))
+    matching.iter().map(|m| {
+        let offset = m.offset as usize;
+        let size = m.size as usize;
+        serde_json::from_slice::<serde_json::Value>(&data[offset..offset+size]).map_err(|e| Error::XclbinInvalidMagicString(e.to_string()))
+    }).collect()
+}
+
+/// Given the build metadata as a serde_json value, look for a specific kernel and return its "arguments" json value 
+pub fn extract_arguments(metadata: &serde_json::Value, kernel_name: &str) -> Result<XclbinKernel> {
+    let bm: BuildMetadata = serde_json::from_str(&metadata.to_string()).unwrap(); // TODO: In future avoid this and directly parse
 }
 
 
