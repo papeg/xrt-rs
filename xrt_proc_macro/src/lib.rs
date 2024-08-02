@@ -11,17 +11,16 @@ pub fn kernel(attrs: TokenStream, items: TokenStream) -> TokenStream {
     }
 
     let parsed_struct = parse_macro_input!(items as ItemStruct);
-    let struct_name = parsed_struct.ident;
+    let struct_name = &parsed_struct.ident;
 
     let result = quote! {
+        #parsed_struct
         impl #struct_name {
             fn ans() -> i32 {
                 return 42;
             }
         }
     };
-    let mut final_stream = TokenStream::new();
-    final_stream.extend(&items.clone().into_iter());
-    final_stream.extend::<proc_macro::TokenStream>(result.into());
-    final_stream
+    println!("MACRO CODE: {}", result);
+    result.into()
 }

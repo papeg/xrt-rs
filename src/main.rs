@@ -3,8 +3,8 @@ use xrt::xclbin_reader::*;
 extern crate xrt_proc_macro;
 use xrt_proc_macro::*;
 
-#[kernel(add_kernel, abc)]
-pub struct MyStruct {};
+#[kernel(add_kernel)]
+pub struct MyStruct;
 
 fn main() {
     let values = get_arguments("hls/vscale_f32_sw_emu.xclbin", "vscale_f32").unwrap();
@@ -13,5 +13,5 @@ fn main() {
     }
 
     let ms = MyStruct;
-    println!("{}", ms.ans());
+    println!("{}", ms::ans());
 }
