@@ -16,7 +16,7 @@ pub fn kernel(attrs: TokenStream, items: TokenStream) -> TokenStream {
     let result = quote! {
         #parsed_struct
         impl #struct_name {
-            fn ans() -> i32 {
+            fn ans(self) -> i32 {
                 return 42;
             }
         }

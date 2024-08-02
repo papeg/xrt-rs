@@ -13,5 +13,5 @@ fn main() {
     }
 
     let ms = MyStruct;
-    println!("{}", ms::ans());
+    println!("{}", ms.ans());
 }
