@@ -3,7 +3,7 @@ use xrt::xclbin_reader::*;
 extern crate xrt_proc_macro;
 use xrt_proc_macro::*;
 
-#[kernel(add_kernel)]
+#[kernel("pathto.xclbin", "vscale_u32")]
 pub struct MyStruct;
 
 fn main() {
