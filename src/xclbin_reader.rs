@@ -1,11 +1,10 @@
 //! Module to read out relevant data from an xclbin file
 //! Can directly convert the information into actual XRT buffers
 use std::collections::HashMap;
-
 use serde::Deserialize;
-
 use crate::Result;
 use crate::error::Error;
+use crate::managed::arguments::ArgumentType;
 
 /// This struct is what is needed to retrieve the kernel arguments from the xclbin. It is parsed to by serde json
 #[derive(Debug, Deserialize)]
@@ -143,14 +142,17 @@ pub fn get_build_metadata(data: &Vec<u8>, headers: &Vec<SectionHeader>) -> Vec<R
 /// Given the build metadata as a serde_json value, look for a specific kernel and return its "arguments" json value 
 pub fn extract_arguments(metadata: &serde_json::Value, kernel_name: &str) -> Result<XclbinKernel> {
     let bm: BuildMetadata = serde_json::from_str(&metadata.to_string()).unwrap(); // TODO: In future avoid this and directly parse
+    bm.get_kernel(kernel_name).ok_or(Error::XclbinNoKernelOfSuchName(kernel_name.to_owned()))
 }
 
+pub fn get_argument_types(kernel: &XclbinKernel) -> Vec<ArgumentType> {
+    let mut v: Vec<ArgumentType> = Vec::new();
+    let kernel_args = kernel.arguments.clone();
+    kernel_args.arguments.sort_by(|a, b| 
+            a.get("id").unwrap().cmp(b.get("id").unwrap())
+    );
 
-// Read the XCLBIN file and create buffers and scalar arguments accordingly. This produces an argumentMapping that
-// a kernel can use to check whether its supplied arguments are correct. It also avoids having to ask the user what arguments
-// are needed and of what type
-/*
-pub fn conjure_kernel_arguments(kernel_name: &str) -> Result<ArgumentMapping> {
-
+    for arguments in kernel_args {
+        v.push()
+    }
 }
-*/

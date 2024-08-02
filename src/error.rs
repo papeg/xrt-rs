@@ -29,6 +29,7 @@ pub enum Error {
     XclbinInvalidMagicString(String),
     XclbinByteReadingError(usize, usize),
     XclbinNoBuildMetadataSection,
+    XclbinNoKernelOfSuchName(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
