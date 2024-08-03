@@ -7,7 +7,7 @@ mod data;
 
 use data::{VScaleTestData, SIZE};
 
-fn run_vscale_simple<
+fn run_vscale_managed<
     T: VScaleTestData + HardwareDatatype + std::fmt::Debug + Copy + std::cmp::PartialEq<T>,
 >() -> Result<()> {
     let xclbin_path = get_xclbin_path(&format!("./hls/vscale_{}", T::name()));
@@ -39,31 +39,31 @@ fn run_vscale_simple<
 }
 
 #[test]
-fn run_vscale_simple_u32() -> Result<()> {
-    run_vscale_simple::<u32>()
+fn run_vscale_managed_u32() -> Result<()> {
+    run_vscale_managed::<u32>()
 }
 
 #[test]
-fn run_vscale_simple_i32() -> Result<()> {
-    run_vscale_simple::<i32>()
+fn run_vscale_managed_i32() -> Result<()> {
+    run_vscale_managed::<i32>()
 }
 
 #[test]
-fn run_vscale_simple_u64() -> Result<()> {
-    run_vscale_simple::<u64>()
+fn run_vscale_managed_u64() -> Result<()> {
+    run_vscale_managed::<u64>()
 }
 
 #[test]
-fn run_vscale_simple_i64() -> Result<()> {
-    run_vscale_simple::<i64>()
+fn run_vscale_managed_i64() -> Result<()> {
+    run_vscale_managed::<i64>()
 }
 
 #[test]
-fn run_vscale_simple_f32() -> Result<()> {
-    run_vscale_simple::<f32>()
+fn run_vscale_managed_f32() -> Result<()> {
+    run_vscale_managed::<f32>()
 }
 
 #[test]
-fn run_vscale_simple_f64() -> Result<()> {
-    run_vscale_simple::<f64>()
+fn run_vscale_managed_f64() -> Result<()> {
+    run_vscale_managed::<f64>()
 }

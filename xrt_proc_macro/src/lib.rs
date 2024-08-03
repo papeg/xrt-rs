@@ -1,7 +1,7 @@
 extern crate proc_macro;
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{self, parse_macro_input, NestedMeta, Lit, LitStr, spanned::Spanned, token::Token, AttributeArgs, DataStruct, ItemStruct};
+use syn::{self, parse_macro_input, NestedMeta, Lit, spanned::Spanned, AttributeArgs, ItemStruct};
 
 mod xclbin_reader;
 
@@ -47,14 +47,23 @@ pub fn kernel(attrs: TokenStream, items: TokenStream) -> TokenStream {
     let parsed_struct = parse_macro_input!(items as ItemStruct);
     let struct_name = &parsed_struct.ident;
 
+    let mut functions = quote! {};
+    
+    let fn_ans = quote! {
+        fn ans(self) -> i32 {
+            return 42;
+        }
+    };
+
+    functions.extend(fn_ans);
+
     let result = quote! {
         #parsed_struct
         impl #struct_name {
-            fn ans(self) -> i32 {
-                return 42;
-            }
+            #functions
         }
     };
+
     println!("MACRO CODE: {}", result);
     result.into()
 }
