@@ -61,6 +61,13 @@ struct XclbinKernel {
     ports: Vec<HashMap<String, String>>
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct Argument {
+    pub name: String,
+    pub type_name: String,
+    pub size: usize,
+}
+
 impl BuildMetadata {
     fn get_kernel(&self, kernel_name: &str) -> Option<XclbinKernel> {
         if self.build_metadata.xclbin.user_regions.len() < 1 {
@@ -152,13 +159,31 @@ fn extract_arguments(metadata: &serde_json::Value, kernel_name: &str) -> Result<
     Ok(kernel.arguments.clone())
 }
 
+pub fn translate_type(type_name: &str) -> String {
+    match type_name {
+        "unsigned int" => "u32", // apparently i32 is also unsigned int
+        "unsigned long long" => "u64", // apparently i64 is also unsigned long long
+        "float" => "f32",
+        "double" => "f64",
+        rest => rest, 
+    }.into()
+}
 
 /// Public function to extract argument data from a given xclbin file. Returns the info as HashMaps per argument, ordered by the arguments ID 
-pub fn get_arguments(path: &str, kernel_name: &str) -> Result<Vec<HashMap<String, String>>> {
+pub fn get_arguments(path: &str, kernel_name: &str) -> Result<Vec<Argument>> {
     let raw = read_xclbin(path)?;
     let sections = get_section_data(&raw)?;
     let bm = get_build_metadata(&raw, &sections)?;
-    return extract_arguments(&bm, kernel_name);
+    // TODO: error handling!
+    Ok(extract_arguments(&bm, kernel_name)?
+        .into_iter()
+        .map(|raw| {
+            Argument{
+                name: raw["name"].clone(),
+                type_name: translate_type(&raw["type"]),
+                size: usize::from_str_radix(&raw["size"].strip_prefix("0x").unwrap(), 16).unwrap(),
+            }
+        }).collect())
 }
 
 /*

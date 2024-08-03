@@ -6,5 +6,5 @@ pub struct VScaleU32;
 
 #[test]
 fn run_vscale_simple_u32() {
-    println!("{}", VScaleU32::run(1, 2, 3, 4));
+    println!("{}", VScaleU32::run(1, 2));
 }

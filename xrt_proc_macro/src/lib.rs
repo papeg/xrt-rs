@@ -41,7 +41,7 @@ pub fn kernel(attrs: TokenStream, items: TokenStream) -> TokenStream {
     let parsed_args = xclbin_reader::get_arguments(&xclbin_path.unwrap(), &kernel_name.unwrap()).unwrap();
 
     for arg in &parsed_args {
-        println!("{}  |  {}  |  {}", arg["name"], arg["type"], arg["size"]);
+        println!("{:?}", arg);
     }
 
     let parsed_struct = parse_macro_input!(items as ItemStruct);
@@ -50,11 +50,14 @@ pub fn kernel(attrs: TokenStream, items: TokenStream) -> TokenStream {
     let mut args = quote! {};
 
     for parsed_arg in &parsed_args {
-        let name = format_ident!("{}_arg", &parsed_arg["name"]);
-        let arg = quote! {
-            #name : u32,
-        };
-        args.extend(arg);
+        if parsed_arg.type_name != "void*" { // this needs a solution!
+            let name = format_ident!("{}_arg", parsed_arg.name);
+            let type_name = format_ident!("{}", parsed_arg.type_name);
+            let arg = quote! {
+                #name : #type_name,
+            };
+            args.extend(arg);
+        }
     }
 
     let result = quote! {
