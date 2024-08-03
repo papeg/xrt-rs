@@ -4,9 +4,16 @@
 
 use std::collections::HashMap;
 use serde::Deserialize;
-use crate::Result;
-use crate::error::Error;
-//use crate::managed::arguments::ArgumentType;
+
+#[derive(Debug)]
+pub enum Error {
+    XclbinInvalidMagicString(String),
+    XclbinByteReadingError(usize, usize),
+    XclbinNoBuildMetadataSection,
+    XclbinNoKernelOfSuchName(String),
+}
+
+pub type Result<T> = std::result::Result<T, Error>;
 
 /// This struct is what is needed to retrieve the kernel arguments from the xclbin. It is parsed to by serde json
 #[derive(Debug, Deserialize)]

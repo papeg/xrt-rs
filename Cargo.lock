@@ -418,8 +418,6 @@ name = "xrt"
 version = "0.3.0"
 dependencies = [
  "bindgen",
- "serde",
- "serde_json",
  "xrt_proc_macro",
 ]
 
@@ -429,5 +427,7 @@ version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "quote",
+ "serde",
+ "serde_json",
  "syn 1.0.109",
 ]
