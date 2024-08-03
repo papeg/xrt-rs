@@ -1,6 +1,6 @@
 extern crate proc_macro;
 use proc_macro::TokenStream;
-use quote::quote;
+use quote::{quote, format_ident};
 use syn::{self, parse_macro_input, NestedMeta, Lit, spanned::Spanned, AttributeArgs, ItemStruct};
 
 mod xclbin_reader;
@@ -38,29 +38,31 @@ pub fn kernel(attrs: TokenStream, items: TokenStream) -> TokenStream {
         return syn::Error::new(attributes[1].span(), "unable to read the kernel name as second attribute argument").to_compile_error().into();
     }
 
-    let args = xclbin_reader::get_arguments(&xclbin_path.unwrap(), &kernel_name.unwrap()).unwrap();
+    let parsed_args = xclbin_reader::get_arguments(&xclbin_path.unwrap(), &kernel_name.unwrap()).unwrap();
 
-    for arg in args {
+    for arg in &parsed_args {
         println!("{}  |  {}  |  {}", arg["name"], arg["type"], arg["size"]);
     }
 
     let parsed_struct = parse_macro_input!(items as ItemStruct);
     let struct_name = &parsed_struct.ident;
 
-    let mut functions = quote! {};
-    
-    let fn_ans = quote! {
-        fn ans(self) -> i32 {
-            return 42;
-        }
-    };
+    let mut args = quote! {};
 
-    functions.extend(fn_ans);
+    for parsed_arg in &parsed_args {
+        let name = format_ident!("{}_arg", &parsed_arg["name"]);
+        let arg = quote! {
+            #name : u32,
+        };
+        args.extend(arg);
+    }
 
     let result = quote! {
         #parsed_struct
         impl #struct_name {
-            #functions
+            fn run(#args) -> u32 {
+                return 42;
+            }
         }
     };
 
