@@ -11,6 +11,7 @@ pub enum Error {
     XclbinByteReadingError(usize, usize),
     XclbinNoBuildMetadataSection,
     XclbinNoKernelOfSuchName(String),
+    XclbinNoArgumentKeyword(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -62,11 +63,18 @@ struct XclbinKernel {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Argument {
+pub struct Argument {
     pub name: String,
     pub type_name: String,
     pub size: usize,
 }
+
+impl Argument {
+    pub fn is_pointer(&self) -> bool {
+        self.type_name.contains("*")
+    }
+}
+
 
 impl BuildMetadata {
     fn get_kernel(&self, kernel_name: &str) -> Option<XclbinKernel> {
@@ -152,11 +160,31 @@ fn get_build_metadata(data: &Vec<u8>, headers: &Vec<SectionHeader>) -> Result<se
     serde_json::from_slice::<serde_json::Value>(&data[offset..offset+size]).map_err(|e| Error::XclbinInvalidMagicString(e.to_string()))
 }
 
-/// Given the build metadata as a serde_json value, look for a specific kernel and return its "arguments" json value 
+/// Find out if a system metadata section exists, and if so get its JSON
+/*
+fn get_system_metadata(data: &Vec<u8>, headers: &Vec<SectionHeader>) -> Result<serde_json::Value> {
+    Err(())
+}*/
+
+
+/// Given the build metadata as a serde_json value, look for a specific kernel and return its "arguments" json value.
+/// In case that void pointers are found, the actual types are tried to be read from the system-metadata section
 fn extract_arguments(metadata: &serde_json::Value, kernel_name: &str) -> Result<Vec<HashMap<String, String>>> {
     let bm: BuildMetadata = serde_json::from_str(&metadata.to_string()).unwrap(); // TODO: In future avoid this and directly parse
     let kernel = bm.get_kernel(kernel_name).ok_or(Error::XclbinNoKernelOfSuchName(kernel_name.to_owned()))?;
-    Ok(kernel.arguments.clone())
+    //return Ok(kernel.arguments.clone());
+    
+    let mut args: Vec<HashMap<String, String>> = Vec::new();
+    for single_arg in kernel.arguments {
+        if translate_type(&single_arg.get("type").ok_or(Error::XclbinNoArgumentKeyword("type".to_string()))?).contains("void*") {
+            // Have to check in SYSTEM_METADATA if the type is noted there
+            args.push(single_arg.clone());
+        } else {
+            // Can simply use the provided arguments
+            args.push(single_arg.clone());
+        }
+    }
+    Ok(args)
 }
 
 pub fn translate_type(type_name: &str) -> String {
@@ -185,31 +213,3 @@ pub fn get_arguments(path: &str, kernel_name: &str) -> Result<Vec<Argument>> {
             }
         }).collect())
 }
-
-/*
-TODO: Write proc macro to create the appropiate code from this 
-Something like:
-
-#[kernel("a.xclbin")]
-struct MyKernel;
-
-to create the function that has the correct parameters for setting the kernel arguments:
-impl MyKernel {
-    fn set(a: u32, b: XRTBuffer<ui64>) {
-    ...
-    }
-}
-
-
-pub fn get_argument_types(kernel: &XclbinKernel) -> Vec<ArgumentType> {
-    let mut v: Vec<ArgumentType> = Vec::new();
-    let kernel_args = kernel.arguments.clone();
-    kernel_args.arguments.sort_by(|a, b| 
-            a.get("id").unwrap().cmp(b.get("id").unwrap())
-    );
-
-    for arguments in kernel_args {
-        v.push()
-    }
-}
-    */

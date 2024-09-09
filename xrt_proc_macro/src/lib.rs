@@ -1,7 +1,7 @@
 extern crate proc_macro;
 use proc_macro::TokenStream;
 use quote::{quote, format_ident};
-use syn::{self, parse_macro_input, NestedMeta, Lit, spanned::Spanned, AttributeArgs, ItemStruct};
+use syn::{self, parse::Parser, parse_macro_input, spanned::Spanned, AttributeArgs, ItemStruct, Lit, NestedMeta};
 
 mod xclbin_reader;
 
@@ -44,12 +44,37 @@ pub fn kernel(attrs: TokenStream, items: TokenStream) -> TokenStream {
         println!("{:?}", arg);
     }
 
-    let parsed_struct = parse_macro_input!(items as ItemStruct);
+    let mut parsed_struct = parse_macro_input!(items as ItemStruct);
     let struct_name = &parsed_struct.ident;
 
     let mut args = quote! {};
 
     for parsed_arg in &parsed_args {
+        // Handling adding buffers to the struct if needed
+        // https://users.rust-lang.org/t/solved-derive-and-proc-macro-add-field-to-an-existing-struct/52307/4
+        let mut changed_name = parsed_arg.name.clone();
+        changed_name.push_str("_buffer");
+        
+        // TODO: Emit warning if a keyword is used as the name for an attribute
+        let name: proc_macro2::TokenStream = changed_name.parse().unwrap();
+        let field_declaration = quote! { pub #name: XRTBuffer };
+        if parsed_arg.is_pointer() {
+            match parsed_struct.fields {
+                syn::Fields::Named(ref mut fields) => {
+                    fields.named.push(
+                        syn::Field::parse_named
+                            .parse2(field_declaration)
+                            .unwrap(),
+                    );
+                },
+                syn::Fields::Unnamed(_) => (),
+                syn::Fields::Unit => {
+                    return syn::Error::new(parsed_struct.span(), "Cannot add kernel methods to unit struct. Initialize as \"pub struct XYZ {}\"").to_compile_error().into();
+                }
+            }
+
+        }
+
         if parsed_arg.type_name != "void*" { // this needs a solution!
             let name = format_ident!("{}_arg", parsed_arg.name);
             let type_name = format_ident!("{}", parsed_arg.type_name);
@@ -61,6 +86,7 @@ pub fn kernel(attrs: TokenStream, items: TokenStream) -> TokenStream {
     }
 
     let result = quote! {
+        use xrt::native::buffer::XRTBuffer;
         #parsed_struct
         impl #struct_name {
             fn run(#args) -> u32 {
